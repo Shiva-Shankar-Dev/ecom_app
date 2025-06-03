@@ -1,4 +1,8 @@
+import 'package:ecom_app/services/firebase_auth.dart';
+import 'package:ecom_app/widgets/auth_button.dart';
+import 'package:ecom_app/widgets/auth_text_field.dart';
 import 'package:flutter/material.dart';
+import '../screens/otp_page.dart';
 
 class MobileLoginPage extends StatefulWidget {
   @override
@@ -7,6 +11,7 @@ class MobileLoginPage extends StatefulWidget {
 
 class _MobileLoginPage extends State<MobileLoginPage> {
   final _formKey = GlobalKey<FormState>();
+  final mobileController = TextEditingController();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -24,20 +29,48 @@ class _MobileLoginPage extends State<MobileLoginPage> {
                 ),
               ),
               SizedBox(height: 32),
-              SizedBox(
-                width: 300,
-                child: TextFormField(
-                  decoration: InputDecoration(labelText: 'Mobile'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your mobile number';
-                    }
-                    return null;
-                  },
-                ),
-              ),
+              AuthTextField(hintText: 'Mobile', controller: mobileController),
               SizedBox(height: 32),
-              ElevatedButton(onPressed: () {}, child: Text('Get OTP')),
+              AuthButton(
+                hintText: 'Get OTP',
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    String number = mobileController.text.trim();
+
+                    // Clean it up (India example)
+                    number = number.replaceAll(
+                      RegExp(r'\D'),
+                      '',
+                    ); // remove non-digits
+                    if (number.startsWith('0')) {
+                      number = number.substring(1);
+                    }
+
+                    final phone = '+91$number'; // E.164 format
+                    print('Sending OTP to $phone');
+                    print("Raw input: ${mobileController.text}");
+                    print("Parsed phone: $phone");
+
+                    verifyPhone(
+                      phoneNumber: phone,
+                      onCodeSent: (verificationId) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                OtpPage(verificationId: verificationId),
+                          ),
+                        );
+                      },
+                      onFailed: (error) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text("OTP Send Failed: $error")),
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
             ],
           ),
         ),

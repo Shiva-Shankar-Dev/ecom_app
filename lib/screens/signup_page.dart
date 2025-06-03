@@ -1,5 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import '../widgets/auth_text_field.dart';
+import '../widgets/auth_button.dart';
 
 var uname = '';
 var pass = '';
@@ -28,6 +31,7 @@ class _SignUpPage extends State<SignUpPage> {
   final mobileController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   void dispose() {
+    super.dispose();
     fullNameController.dispose();
     emailController.dispose();
     passwordController.dispose();
@@ -37,55 +41,96 @@ class _SignUpPage extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Sign Up',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(
-                width: 300,
-                child: TextFormField(
-                  decoration: InputDecoration(labelText: 'Email'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your email';
+      body: SingleChildScrollView(
+        child: Container(
+          height: MediaQuery.of(context).size.height,
+          alignment: Alignment.center,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Sign Up.',
+                  style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 27),
+                Form(
+                  child: Column(
+                    children: [
+                      AuthTextField(
+                        hintText: 'User name',
+                        controller: fullNameController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Username cannot be empty';
+                          }
+                          return null;
+                        },
+                      ),
+                      AuthTextField(
+                        hintText: 'Email',
+                        controller: emailController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Email cannot be empty';
+                          }
+                          return null;
+                        },
+                      ),
+                      AuthTextField(
+                        hintText: 'Password',
+                        controller: passwordController,
+                        hide: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password cannot be empty';
+                          }
+                          return null;
+                        },
+                      ),
+                      AuthTextField(
+                        hintText: 'Mobile',
+                        controller: mobileController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Mobile cannot be empty';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 20),
+                AuthButton(
+                  hintText: 'Sign Up',
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      Navigator.pushNamed(context, '/home');
                     }
-                    uname = value;
-                    return null;
                   },
                 ),
-              ),
-              SizedBox(height: 16),
-              SizedBox(
-                width: 300,
-                child: TextFormField(
-                  obscureText: true,
-                  decoration: InputDecoration(labelText: 'Password'),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your password';
-                    }
-                    pass = value;
-                    return null;
-                  },
+                SizedBox(height: 36),
+                RichText(
+                  text: TextSpan(
+                    text: 'Already have an account? ',
+                    children: [
+                      TextSpan(
+                        text: 'Login',
+                        style: TextStyle(color: Colors.greenAccent),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
+                            Navigator.pushNamed(context, '/');
+                          },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(height: 36),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    signUp(uname, pass);
-                    Navigator.pushNamed(context, '/home');
-                  }
-                },
-                child: Text('Sign Up'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

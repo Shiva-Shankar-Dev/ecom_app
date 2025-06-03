@@ -1,3 +1,4 @@
+import 'package:ecom_app/screens/otp_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'screens/login_page.dart';
@@ -30,6 +31,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => SignUpPage(),
         '/home': (context) => HomePage(),
         '/mobile': (context) => MobileLoginPage(),
+        '/otp': (context) => OtpPage(verificationId: null),
       },
     );
   }

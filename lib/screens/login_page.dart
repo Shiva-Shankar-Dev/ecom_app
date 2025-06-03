@@ -1,9 +1,9 @@
+import 'package:ecom_app/widgets/auth_button.dart';
+import 'package:ecom_app/widgets/auth_text_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-
-var uname = '';
-var pass = '';
+import '../services/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -12,6 +12,8 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPage extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
   Future<void> signIn(String email, String password) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -39,69 +41,51 @@ class _LoginPage extends State<LoginPage> {
                     Text(
                       'Login',
                       style: TextStyle(
-                        fontSize: 36,
+                        fontSize: 50,
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.left,
                     ),
                     SizedBox(height: 32),
-                    SizedBox(
-                      width: 300,
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            TextFormField(
-                              decoration: InputDecoration(
-                                labelText: 'Username',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter you username';
-                                }
-                                uname = value;
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: 16),
-                            TextFormField(
-                              obscureText: true,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                              ),
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your password';
-                                }
-                                pass = value;
-                                return null;
-                              },
-                            ),
-                          ],
-                        ),
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          AuthTextField(
+                            hintText: 'Email',
+                            controller: emailController,
+                          ),
+                          AuthTextField(
+                            hintText: 'Password',
+                            controller: passwordController,
+                            hide: true,
+                          ),
+                          SizedBox(height: 20),
+                          AuthButton(
+                            hintText: 'Login',
+                            onPressed: () {
+                              if (_formKey.currentState!.validate()) {
+                                signInUser(
+                                  emailController.text,
+                                  passwordController.text,
+                                  context,
+                                );
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ),
-                    SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          signIn(uname, pass);
-                          Navigator.pushNamed(context, '/home');
-                        }
-                      },
-                      child: Text('Login'),
-                    ),
+
                     SizedBox(height: 10),
-                    SizedBox(child: Text('or')),
                     SizedBox(height: 10),
                     RichText(
                       text: TextSpan(
                         text: 'Login using ',
                         children: [
                           TextSpan(
-                            text: 'Mobile number',
-                            style: TextStyle(color: Colors.deepPurple.shade200),
+                            text: 'Mobile instead?',
+                            style: TextStyle(color: Colors.greenAccent),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.pushNamed(context, '/mobile');
@@ -110,7 +94,7 @@ class _LoginPage extends State<LoginPage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 32),
+                    SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -126,7 +110,7 @@ class _LoginPage extends State<LoginPage> {
                         children: [
                           TextSpan(
                             text: 'Sign Up',
-                            style: TextStyle(color: Colors.deepPurple.shade200),
+                            style: TextStyle(color: Colors.greenAccent),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.pushNamed(context, '/signup');
