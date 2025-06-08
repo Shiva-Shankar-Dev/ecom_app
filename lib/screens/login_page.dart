@@ -1,9 +1,7 @@
 import 'package:ecom_app/widgets/auth_button.dart';
 import 'package:ecom_app/widgets/auth_text_field.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import '../services/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -14,17 +12,6 @@ class _LoginPage extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  Future<void> signIn(String email, String password) async {
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      print("Sign in successful");
-    } catch (e) {
-      print("Error: $e");
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,18 +48,7 @@ class _LoginPage extends State<LoginPage> {
                             hide: true,
                           ),
                           SizedBox(height: 20),
-                          AuthButton(
-                            hintText: 'Login',
-                            onPressed: () {
-                              if (_formKey.currentState!.validate()) {
-                                signInUser(
-                                  emailController.text,
-                                  passwordController.text,
-                                  context,
-                                );
-                              }
-                            },
-                          ),
+                          AuthButton(hintText: 'Login', onPressed: () {}),
                         ],
                       ),
                     ),

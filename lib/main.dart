@@ -1,24 +1,25 @@
 import 'package:ecom_app/screens/otp_page.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:ecom_app/secrets/app_secrets.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 import 'screens/home_page.dart';
 import 'screens/mobile_login_page.dart';
 
-var uname = '';
-var pass = '';
-//import 'package:firebase_core/firebase_core.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  // ignore: unused_local_variable
+  final supabase = await Supabase.initialize(
+    url: AppSecrets.supabaseUrl,
+    anonKey: AppSecrets.supabaseApi,
+  );
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -31,7 +32,15 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => SignUpPage(),
         '/home': (context) => HomePage(),
         '/mobile': (context) => MobileLoginPage(),
-        '/otp': (context) => OtpPage(verificationId: null),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/otp') {
+          final args = settings.arguments as Map<String, dynamic>;
+          return MaterialPageRoute(
+            builder: (_) => OtpPage(phone: args['phone']),
+          );
+        }
+        return null;
       },
     );
   }

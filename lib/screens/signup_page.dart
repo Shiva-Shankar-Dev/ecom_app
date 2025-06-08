@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../widgets/auth_text_field.dart';
@@ -13,18 +12,6 @@ class SignUpPage extends StatefulWidget {
 }
 
 class _SignUpPage extends State<SignUpPage> {
-  Future<void> signUp(String username, String password) async {
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: username,
-        password: password,
-      );
-      print("Sign up successful");
-    } catch (e) {
-      print("Error: $e");
-    }
-  }
-
   final fullNameController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
