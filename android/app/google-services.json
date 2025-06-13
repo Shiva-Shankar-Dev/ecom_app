@@ -12,7 +12,12 @@
           "package_name": "com.example.ecom_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "720739834245-s47s0vm0qq6shkapcrodautm7fnfqgdf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC1NasrGGb8izlcMCU8TzBHuJp6Xt4INlA"
@@ -20,7 +25,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "720739834245-s47s0vm0qq6shkapcrodautm7fnfqgdf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
