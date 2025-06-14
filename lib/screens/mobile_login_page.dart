@@ -1,3 +1,4 @@
+import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -49,27 +50,54 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
       appBar: AppBar(title: Text('Phone Login')),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Enter your Mobile', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
-            SizedBox(height: 20),
-            TextField(
-              controller: mobileController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                hintText: 'Mobile',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Enter your Mobile', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
+              SizedBox(height: 50),
+              TextField(
+                controller: mobileController,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(width: 3),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: colorPallete.color1, width: 3),
+                  ),
+                  hintText: 'Mobile',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
-            ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _isSending ? null : _sendOtp,
-              child: _isSending
-                  ? CircularProgressIndicator()
-                  : Text('Send OTP', style: TextStyle(fontSize: 18)),
-            ),
-          ],
+              SizedBox(height: 50),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [colorPallete.color1, colorPallete.color2],
+                    begin: Alignment.bottomLeft,
+                    end: Alignment.topRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    fixedSize: const Size(320, 55),
+                    shadowColor: colorPallete.color4,
+                    backgroundColor: colorPallete.color4,
+                  ),
+                  onPressed: _isSending ? null : _sendOtp,
+                  child: _isSending
+                      ? CircularProgressIndicator()
+                      : Text('Send OTP', style: TextStyle(color: Colors.white,fontSize: 18)),
+                ),
+
+              ),
+              SizedBox(height: 50,)
+            ],
+          ),
         ),
       ),
     );

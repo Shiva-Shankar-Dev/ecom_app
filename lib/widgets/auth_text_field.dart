@@ -1,3 +1,4 @@
+import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/material.dart';
 
 // ignore: must_be_immutable
@@ -24,11 +25,11 @@ class AuthTextField extends StatelessWidget {
             hintText: hintText,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.white70, width: 3),
+              borderSide: BorderSide(width: 3),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: Colors.greenAccent, width: 3),
+              borderSide: BorderSide(color: colorPallete.color1, width: 3),
             ),
           ),
           controller: controller,

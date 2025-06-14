@@ -1,3 +1,4 @@
+import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:ecom_app/widgets/auth_button.dart';
 import 'package:ecom_app/widgets/auth_text_field.dart';
 import 'package:flutter/gestures.dart';
@@ -61,7 +62,7 @@ class _LoginPage extends State<LoginPage> {
                         children: [
                           TextSpan(
                             text: 'Mobile instead?',
-                            style: TextStyle(color: Colors.greenAccent),
+                            style: TextStyle(color: colorPallete.color1),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.pushNamed(context, '/mobile');
@@ -86,7 +87,7 @@ class _LoginPage extends State<LoginPage> {
                         children: [
                           TextSpan(
                             text: 'Sign Up',
-                            style: TextStyle(color: Colors.greenAccent),
+                            style: TextStyle(color: colorPallete.color1),
                             recognizer: TapGestureRecognizer()
                               ..onTap = () {
                                 Navigator.pushNamed(context, '/signup');
