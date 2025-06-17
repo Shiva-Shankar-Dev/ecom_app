@@ -1,3 +1,5 @@
+import 'package:animated_splash_screen/animated_splash_screen.dart';
+import 'package:ecom_app/animated_splash_screen_widget.dart';
 import 'package:ecom_app/screens/otp_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -37,7 +39,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(brightness: Brightness.dark),
       initialRoute: '/',
       routes: {
-        '/': (context) => LoginPage(),
+        '/': (context) => AnimatedSplashScreenWidget(),
+        '/login': (context) => LoginPage(),
         '/signup': (context) => SignUpPage(),
         '/home': (context) => HomePage(),
         '/mobile': (context) => MobileLoginPage(),

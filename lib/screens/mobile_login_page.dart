@@ -1,6 +1,7 @@
 import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lottie/lottie.dart';
 
 class MobileLoginPage extends StatefulWidget {
   const MobileLoginPage({Key? key}) : super(key: key);
@@ -47,7 +48,8 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Phone Login')),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(foregroundColor: Colors.white, backgroundColor: colorPallete.color4,),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Center(
@@ -62,7 +64,7 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
                 decoration: InputDecoration(
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(width: 3),
+                    borderSide: BorderSide(color: Colors.grey, width: 3),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),

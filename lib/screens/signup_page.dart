@@ -1,10 +1,11 @@
+import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
+import 'package:ecom_app/services/auth.dart';
 
-var uname = '';
-var pass = '';
 
 class SignUpPage extends StatefulWidget {
   @override
@@ -17,6 +18,23 @@ class _SignUpPage extends State<SignUpPage> {
   final passwordController = TextEditingController();
   final mobileController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
+
+  void handleSingup() async{
+    String? result = await _authService.signUpUser(
+        name: fullNameController.text,
+        email: emailController.text,
+        password: passwordController.text,
+        mobile: mobileController.text
+    );
+    if (result == null) {
+      print("Signup success!");
+      Navigator.pushNamed(context, '/home');
+    } else {
+      print("Signup error: $result");
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result?? 'Failed to SignUp')));
+    }
+  }
   void dispose() {
     super.dispose();
     fullNameController.dispose();
@@ -38,6 +56,7 @@ class _SignUpPage extends State<SignUpPage> {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                SizedBox(height: 85,),
                 Text(
                   'Sign Up.',
                   style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
@@ -96,7 +115,7 @@ class _SignUpPage extends State<SignUpPage> {
                   hintText: 'Sign Up',
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      Navigator.pushNamed(context, '/home');
+                      handleSingup();
                     }
                   },
                 ),
@@ -107,10 +126,10 @@ class _SignUpPage extends State<SignUpPage> {
                     children: [
                       TextSpan(
                         text: 'Login',
-                        style: TextStyle(color: Colors.greenAccent),
+                        style: TextStyle(color: colorPallete.color1),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
-                            Navigator.pushNamed(context, '/');
+                            Navigator.pushNamed(context, '/login');
                           },
                       ),
                     ],

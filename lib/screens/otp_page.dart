@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lottie/lottie.dart';
 
 import '../colorPallete/color_pallete.dart';
 
@@ -55,7 +56,8 @@ class _OtpPageState extends State<OtpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Verify OTP')),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(title: Text('Verify OTP'), backgroundColor: colorPallete.color4,),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Center(
