@@ -1,4 +1,3 @@
-import 'package:animated_splash_screen/animated_splash_screen.dart';
 import 'package:ecom_app/animated_splash_screen_widget.dart';
 import 'package:ecom_app/screens/otp_page.dart';
 import 'package:firebase_core/firebase_core.dart';

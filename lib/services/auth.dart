@@ -13,14 +13,12 @@ class AuthService {
     required String mobile,
   }) async {
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       String uid = userCredential.user!.uid;
 
-      await _firestore.collection('users').doc(uid).set({
+      await _firestore.collection('sellers').doc(uid).set({
         'name': name,
         'email': email,
         'mobile': mobile,

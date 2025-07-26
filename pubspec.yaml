@@ -43,8 +43,11 @@ dependencies:
   file_picker:
   lottie:
   animated_splash_screen:
+  hive: 
 
 dev_dependencies:
+  flutter_launcher_icons:
+
   flutter_test:
     sdk: flutter
 
@@ -58,7 +61,10 @@ dev_dependencies:
   build_runner: ^2.4.8
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
-
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
 # The following section is specific to Flutter packages.
 flutter:
   # The following line ensures that the Material Icons font is

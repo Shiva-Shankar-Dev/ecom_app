@@ -6,7 +6,6 @@ import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
 import 'package:ecom_app/services/auth.dart';
 
-
 class SignUpPage extends StatefulWidget {
   @override
   State<SignUpPage> createState() => _SignUpPage();
@@ -20,21 +19,24 @@ class _SignUpPage extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
 
-  void handleSingup() async{
+  void handleSingup() async {
     String? result = await _authService.signUpUser(
-        name: fullNameController.text,
-        email: emailController.text,
-        password: passwordController.text,
-        mobile: mobileController.text
+      name: fullNameController.text,
+      email: emailController.text,
+      password: passwordController.text,
+      mobile: mobileController.text,
     );
     if (result == null) {
       print("Signup success!");
       Navigator.pushNamed(context, '/home');
     } else {
       print("Signup error: $result");
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result?? 'Failed to SignUp')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result ?? 'Failed to SignUp')));
     }
   }
+
   void dispose() {
     super.dispose();
     fullNameController.dispose();
@@ -56,7 +58,7 @@ class _SignUpPage extends State<SignUpPage> {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(height: 85,),
+                SizedBox(height: 85),
                 Text(
                   'Sign Up.',
                   style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
