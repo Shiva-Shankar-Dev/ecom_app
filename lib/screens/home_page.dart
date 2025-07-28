@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:dotted_border/dotted_border.dart';
+import 'package:ecom_app/widgets/auth_button.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:excel/excel.dart';
@@ -11,6 +13,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:ecom_app/services/auth.dart';
 import 'package:hive/hive.dart';
+import 'package:lottie/lottie.dart';
 
 class Product {
   final String title, description, deliveryTime, ratings, pid;
@@ -297,17 +300,32 @@ class _HomePage extends State<HomePage> {
             ? Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
+                    Lottie.asset('assets/post.json', width: 300, height: 300),
+                    SizedBox(height: 20),
                     Text(
-                      'Products',
+                      'No Products Found',
                       style: TextStyle(
-                        fontSize: 36,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    SizedBox(height: 10),
                     Text(
-                      'There are no products available to display!',
-                      style: TextStyle(color: Colors.grey),
+                      'Please add products to get started.',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    SizedBox(height: 20),
+                    AuthButton(
+                      hintText: 'Add Products',
+                      onPressed: () {
+                        pickAndStoreExcel().then((_) {
+                          loadProducts().then((_) {
+                            uploadProductsToFirestore();
+                          });
+                        });
+                      },
                     ),
                   ],
                 ),
@@ -316,7 +334,7 @@ class _HomePage extends State<HomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Products',
+                    'Your Products',
                     style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 10),

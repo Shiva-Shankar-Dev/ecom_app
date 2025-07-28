@@ -39,9 +39,12 @@ class _LoginPage extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
+      body: AnimatedContainer(
         //decoration: BoxDecoration(image: DecorationImage(image: AssetImage('./assets/background.jpg'), fit: BoxFit.cover)),
         height: double.infinity,
+        duration: Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        transformAlignment: Alignment.center,
         child: SingleChildScrollView(
           child: Center(
             child: Column(
