@@ -81,68 +81,48 @@ class _HomePage extends State<HomePage> {
     loadProducts();
   }
 
-  double _parsePrice(dynamic value) {
-    if (value == null) return 0.0;
-
-    if (value is double) return value;
-
-    if (value is int) return value.toDouble();
-
-    if (value is DateTime) return 0.0; // Don't treat dates as price
-
-    final str = value.toString().replaceAll(RegExp(r'[^\d.]'), '');
-
-    return double.tryParse(str) ?? 0.0;
+  Future<void> loadProducts() async {
+    // Load products directly from Firestore since that's where the actual products are stored
+    await loadProductsFromFirestore();
+    print("Products loaded from Firestore: ${products.length}");
   }
 
-  Future<void> loadProducts() async {
-    final excelData = await readExcelFromHive();
-    print("Excel rows loaded: $excelData");
+  Future<void> loadProductsFromFirestore() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser?.uid;
+      if (user == null) {
+        print("User not logged in!");
+        return;
+      }
 
-    setState(() {
-      products = excelData.map((productMap) {
-        // Extract known fields
-        final title = productMap['Title']?.toString() ?? 'No Title';
-        final description = productMap['Description']?.toString() ?? '';
-        final price = _parsePrice(productMap['Price']);
-        final deliveryTime = productMap['DeliveryTime']?.toString() ?? 'N/A';
-        final ratings = productMap['Rating']?.toString() ?? 'No Ratings';
+      final QuerySnapshot existingProducts = await FirebaseFirestore.instance
+          .collection('products')
+          .where('sellerId', isEqualTo: user)
+          .get();
 
-        // Split images by comma if multiple provided
-        final imageField = productMap['Images']?.toString() ?? '';
-        final images = imageField.split(',').map((e) => e.trim()).toList();
+      setState(() {
+        products = existingProducts.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
 
-        // Create extraFields by filtering out known ones
-        final extraFieldsRaw = Map<String, dynamic>.from(productMap)
-          ..remove('Title')
-          ..remove('Images')
-          ..remove('Description')
-          ..remove('Price')
-          ..remove('DeliveryTime')
-          ..remove(
-            'Ratings',
-          ) // <- typo fix: your code says 'reviews', but Excel uses 'Ratings'
-          // Optional: remove PID if you already extract it below
-          ..remove('PID');
+          return Product(
+            title: data['title']?.toString() ?? 'No Title',
+            description: '', // Firestore doesn't store description separately
+            price: (data['price'] is num)
+                ? (data['price'] as num).toDouble()
+                : 0.0,
+            deliveryTime: data['delivery']?.toString() ?? 'N/A',
+            ratings: data['ratings']?.toString() ?? 'No Ratings',
+            images: List<String>.from(data['images'] ?? []),
+            extraFields: Map<String, dynamic>.from(data['extraFields'] ?? {}),
+            pid: data['pid']?.toString() ?? 'No product ID',
+          );
+        }).toList();
+      });
 
-        final extraFields = extraFieldsRaw.map((key, value) {
-          return MapEntry(key, value?.toString() ?? '');
-        });
-        final String pid = productMap['PID']?.toString() ?? 'No product ID';
-        return Product(
-          title: title,
-          description: description,
-          price: price,
-          deliveryTime: deliveryTime,
-          ratings: ratings,
-          images: images,
-          extraFields: extraFields,
-          pid: pid,
-        );
-      }).toList();
-    });
-
-    print("Products after parsing: $products");
+      print("✅ Loaded ${products.length} products from Firestore");
+    } catch (e) {
+      print("❌ Failed to load products from Firestore: $e");
+    }
   }
 
   Future<void>? uploadProductsToFirestore() async {
@@ -224,12 +204,146 @@ class _HomePage extends State<HomePage> {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
 
     if (result != null && result.files.single.bytes != null) {
-      final box = await Hive.openBox('filesBox');
-      await box.put('excelFile', result.files.single.bytes);
-      print("Excel file saved to Hive.");
-      await loadProducts(); // Reload products after storing
+      // Process Excel file directly and upload to Firestore
+      final excelData = await processExcelFile(result.files.single.bytes!);
+      if (excelData.isNotEmpty) {
+        await uploadExcelProductsToFirestore(excelData);
+        // Reload products from Firestore after upload
+        await loadProducts();
+      }
     } else {
       print("File picking canceled or failed.");
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> processExcelFile(Uint8List bytes) async {
+    final excel = Excel.decodeBytes(bytes);
+    final sheet = excel.tables[excel.tables.keys.first]; // First sheet
+
+    if (sheet == null) return [];
+
+    final headers = sheet.rows.first
+        .map((cell) => cell?.value?.toString() ?? "")
+        .toList();
+    final products = <Map<String, dynamic>>[];
+
+    for (var i = 1; i < sheet.rows.length; i++) {
+      final row = sheet.rows[i];
+      final product = <String, dynamic>{};
+
+      for (var j = 0; j < headers.length; j++) {
+        product[headers[j]] = row[j]?.value;
+      }
+
+      products.add(product);
+    }
+
+    return products;
+  }
+
+  double _parsePrice(dynamic value) {
+    if (value == null) return 0.0;
+
+    if (value is double) return value;
+
+    if (value is int) return value.toDouble();
+
+    if (value is DateTime) return 0.0; // Don't treat dates as price
+
+    final str = value.toString().replaceAll(RegExp(r'[^\d.]'), '');
+
+    return double.tryParse(str) ?? 0.0;
+  }
+
+  Future<void> uploadExcelProductsToFirestore(
+    List<Map<String, dynamic>> excelData,
+  ) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser?.uid;
+      if (user == null) {
+        print("User not logged in!");
+        return;
+      }
+
+      // Get all existing products for this seller
+      final QuerySnapshot existingProducts = await FirebaseFirestore.instance
+          .collection('products')
+          .where('sellerId', isEqualTo: user)
+          .get();
+
+      // Create a map of existing products by PID for quick lookup
+      Map<String, DocumentSnapshot> existingProductMap = {};
+      for (var doc in existingProducts.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final pid = data['pid']?.toString();
+        if (pid != null) {
+          existingProductMap[pid] = doc;
+        }
+      }
+
+      int updatedCount = 0;
+      int addedCount = 0;
+
+      for (var productMap in excelData) {
+        // Extract known fields
+        final title = productMap['Title']?.toString() ?? 'No Title';
+        final price = _parsePrice(productMap['Price']);
+        final deliveryTime = productMap['DeliveryTime']?.toString() ?? 'N/A';
+        final ratings = productMap['Rating']?.toString() ?? 'No Ratings';
+        final pid = productMap['PID']?.toString() ?? 'No product ID';
+
+        // Split images by comma if multiple provided
+        final imageField = productMap['Images']?.toString() ?? '';
+        final images = imageField.split(',').map((e) => e.trim()).toList();
+
+        // Create extraFields by filtering out known ones
+        final extraFieldsRaw = Map<String, dynamic>.from(productMap)
+          ..remove('Title')
+          ..remove('Images')
+          ..remove('Description')
+          ..remove('Price')
+          ..remove('DeliveryTime')
+          ..remove('Ratings')
+          ..remove('PID');
+
+        final cleanedExtraFields = extraFieldsRaw.map((key, value) {
+          return MapEntry(key, value?.toString() ?? '');
+        })..removeWhere((key, value) => value.isEmpty);
+
+        final productData = {
+          'sellerId': user,
+          'pid': pid,
+          'title': title,
+          'images': images,
+          'ratings': ratings,
+          'price': price,
+          'delivery': deliveryTime,
+          if (cleanedExtraFields.isNotEmpty) 'extraFields': cleanedExtraFields,
+        };
+
+        // Check if product already exists
+        if (existingProductMap.containsKey(pid)) {
+          // Update existing product
+          final existingDoc = existingProductMap[pid]!;
+          await existingDoc.reference.update(productData);
+          updatedCount++;
+          print("✅ Product '$title' (PID: $pid) updated in Firestore.");
+        } else {
+          // Add new product
+          await FirebaseFirestore.instance
+              .collection('products')
+              .add(productData);
+          addedCount++;
+          print("✅ Product '$title' (PID: $pid) added to Firestore.");
+        }
+      }
+
+      print(
+        "✅ Upload complete! Added: $addedCount, Updated: $updatedCount products.",
+      );
+    } catch (e) {
+      print("❌ Upload failed: $e");
+      rethrow;
     }
   }
 
@@ -244,11 +358,8 @@ class _HomePage extends State<HomePage> {
             icon: Icon(Icons.add),
             tooltip: 'Add products',
             onPressed: () async {
-              await pickAndStoreExcel();
-              await loadProducts();
-
               try {
-                await uploadProductsToFirestore();
+                await pickAndStoreExcel();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Products uploaded/updated successfully!'),
@@ -319,12 +430,15 @@ class _HomePage extends State<HomePage> {
                     SizedBox(height: 20),
                     AuthButton(
                       hintText: 'Add Products',
-                      onPressed: () {
-                        pickAndStoreExcel().then((_) {
-                          loadProducts().then((_) {
-                            uploadProductsToFirestore();
-                          });
-                        });
+                      onPressed: () async {
+                        try {
+                          await pickAndStoreExcel();
+                        } catch (e) {
+                          print("❌ Upload failed: $e");
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Upload failed: $e')),
+                          );
+                        }
                       },
                     ),
                   ],
