@@ -24,27 +24,54 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
 
     setState(() => _isSending = true);
 
-    await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: phone,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        // Auto-sign in flow (optional)
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message ?? 'Error')));
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        Navigator.pushNamed(
-          context,
-          '/otp',
-          arguments: {'phone': phone, 'verificationId': verificationId},
-        );
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {},
-    );
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-sign in flow (optional)
+          print("Auto verification completed");
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          print("Verification failed: ${e.code} - ${e.message}");
+          String errorMessage = e.message ?? 'Verification failed';
 
-    setState(() => _isSending = false);
+          // Handle specific reCAPTCHA errors
+          if (e.code == 'invalid-app-credential') {
+            errorMessage =
+                'App verification failed. Please check your Firebase configuration.';
+          } else if (e.code == 'too-many-requests') {
+            errorMessage = 'Too many requests. Please try again later.';
+          } else if (e.code == 'captcha-check-failed') {
+            errorMessage = 'reCAPTCHA verification failed. Please try again.';
+          }
+
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(errorMessage)));
+          setState(() => _isSending = false);
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          print("OTP sent successfully");
+          setState(() => _isSending = false);
+          Navigator.pushNamed(
+            context,
+            '/otp',
+            arguments: {'phone': phone, 'verificationId': verificationId},
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          print("Auto retrieval timeout");
+          setState(() => _isSending = false);
+        },
+        timeout: Duration(seconds: 60),
+      );
+    } catch (e) {
+      print("Error sending OTP: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send OTP. Please try again.')),
+      );
+      setState(() => _isSending = false);
+    }
   }
 
   @override
@@ -81,7 +108,8 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
                       width: 3,
                     ),
                   ),
-                  hintText: 'Mobile',
+                  hintText: 'Mobile (e.g., +1234567890)',
+                  helperText: 'Include country code (+91 for India)',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),

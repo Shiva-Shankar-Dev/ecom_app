@@ -60,6 +60,7 @@ class _LoginPage extends State<LoginPage> {
                         style: TextStyle(
                           fontSize: 50,
                           fontWeight: FontWeight.bold,
+                          fontFamily: 'DMSerifText',
                         ),
                         textAlign: TextAlign.left,
                       ),

@@ -1,14 +1,11 @@
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
-import 'package:dotted_border/dotted_border.dart';
 import 'package:ecom_app/widgets/auth_button.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:excel/excel.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_cloud_firestore/firebase_cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 //import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:ecom_app/services/auth.dart';
@@ -413,7 +410,7 @@ class _HomePage extends State<HomePage> {
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    Lottie.asset('assets/post.json', width: 300, height: 300),
+                    Lottie.asset('assets/post.json', width: 200, height: 200),
                     SizedBox(height: 20),
                     Text(
                       'No Products Found',

@@ -61,7 +61,11 @@ class _SignUpPage extends State<SignUpPage> {
                 SizedBox(height: 85),
                 Text(
                   'Sign Up.',
-                  style: TextStyle(fontSize: 50, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 50,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'DMSerifText',
+                  ),
                 ),
                 SizedBox(height: 27),
                 Form(

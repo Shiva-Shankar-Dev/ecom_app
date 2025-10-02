@@ -14,7 +14,7 @@ void main() async {
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: FirebaseOptions(
-          apiKey: "AIzaSyBb_1jJnMQy2qAebBpDnojunskioxt7omg",
+          apiKey: "AIzaSyC1NasrGGb8izlcMCU8TzBHuJp6Xt4INlA",
           appId: "1:720739834245:android:258b055c58eb166c02ccec",
           messagingSenderId: "720739834245",
           projectId: "ecom-app-af213",
