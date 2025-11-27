@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class MobileLoginPage extends StatefulWidget {
-  const MobileLoginPage({Key? key}) : super(key: key);
+  const MobileLoginPage({super.key});
 
   @override
   State<MobileLoginPage> createState() => _MobileLoginPageState();

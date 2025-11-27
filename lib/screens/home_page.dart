@@ -103,7 +103,7 @@ class _HomePage extends State<HomePage> {
 
           return Product(
             title: data['title']?.toString() ?? 'No Title',
-            description: '', // Firestore doesn't store description separately
+            description: '',
             price: (data['price'] is num)
                 ? (data['price'] as num).toDouble()
                 : 0.0,

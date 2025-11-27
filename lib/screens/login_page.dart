@@ -6,6 +6,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   State<LoginPage> createState() => _LoginPage();
 }
@@ -15,17 +17,20 @@ class _LoginPage extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final AuthService _authService = AuthService();
-  void loginhandle() async {
-    String? result = await _authService.signInUser(
+
+  void loginHandle() async {
+    String? result = await _authService.loginUser(
       email: emailController.text,
       password: passwordController.text,
     );
     if (result == null) {
+      if (!mounted) return;
       Navigator.pushNamed(context, '/home');
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result)));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result))
+      );
     }
   }
 
@@ -82,7 +87,7 @@ class _LoginPage extends State<LoginPage> {
                             AuthButton(
                               hintText: 'Login',
                               onPressed: () {
-                                loginhandle();
+                                loginHandle();
                               },
                             ),
                           ],

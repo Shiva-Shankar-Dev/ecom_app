@@ -2,8 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // Sign up
   Future<String?> signUpUser({
@@ -13,22 +13,21 @@ class AuthService {
     required String mobile,
   }) async {
     try {
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(email: email, password: password);
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-      String uid = userCredential.user!.uid;
-
-      await _firestore.collection('sellers').doc(uid).set({
+      await _firestore.collection('sellers').doc(userCredential.user!.uid).set({
         'name': name,
         'email': email,
         'mobile': mobile,
-        'createdAt': Timestamp.now(),
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      return null; // success
+      return null;
     } catch (e) {
-      print('Firebase SignUp error: $e');
-      return e.toString(); // return error message
+      return e.toString();
     }
   }
 
@@ -39,41 +38,22 @@ class AuthService {
   }) async {
     try {
       await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return null; // success
+      return null;
     } catch (e) {
-      return e.toString(); // return error message
+      return e.toString();
     }
   }
 
   // Sign out
-  Future<void> signOut() async {
-    await _auth.signOut();
-  }
+  Future<void> signOut() => _auth.signOut();
 
   // Get current user ID
-  String? getCurrentUID() {
-    return _auth.currentUser?.uid;
-  }
+  String? getCurrentUID() => _auth.currentUser?.uid;
 
   // Get user details
-  Future<DocumentSnapshot> getUserDetails() async {
+  Future<DocumentSnapshot<Map<String, dynamic>>> getUserDetails() {
     final uid = getCurrentUID();
+    if (uid == null) throw Exception('User not authenticated');
     return _firestore.collection('users').doc(uid).get();
-  }
-
-  Future<String?> signInUser({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      return null; // success
-    } catch (e) {
-      print('Login error: $e');
-      return e.toString(); // return error string
-    }
   }
 }
