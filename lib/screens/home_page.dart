@@ -12,33 +12,21 @@ import 'package:ecom_app/services/auth.dart';
 import 'package:hive/hive.dart';
 import 'package:lottie/lottie.dart';
 
-class Product {
-  final String title, description, deliveryTime, ratings, pid;
-  final double price;
-  final List<String> images;
-  final Map<String, dynamic> extraFields;
-
-  Product({
-    required this.title,
-    required this.images,
-    required this.description,
-    required this.price,
-    required this.deliveryTime,
-    required this.ratings,
-    required this.extraFields,
-    required this.pid,
-  });
-}
+import '../models/product.dart';
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   State<HomePage> createState() => _HomePage();
 }
 
 class _HomePage extends State<HomePage> {
-  AuthService _authService = AuthService();
+  final AuthService _authService = AuthService();
 
   List<Product> products = [];
+
+  //reading excel
   Future<List<Map<String, dynamic>>> readExcelFromHive() async {
     final box = Hive.box('filesBox');
     final Uint8List? bytes = box.get('excelFile');
@@ -78,8 +66,8 @@ class _HomePage extends State<HomePage> {
     loadProducts();
   }
 
+  // Load products directly from Firestore since that's where the actual products are stored
   Future<void> loadProducts() async {
-    // Load products directly from Firestore since that's where the actual products are stored
     await loadProductsFromFirestore();
     print("Products loaded from Firestore: ${products.length}");
   }
@@ -102,16 +90,16 @@ class _HomePage extends State<HomePage> {
           final data = doc.data() as Map<String, dynamic>;
 
           return Product(
-            title: data['title']?.toString() ?? 'No Title',
-            description: '',
-            price: (data['price'] is num)
-                ? (data['price'] as num).toDouble()
-                : 0.0,
-            deliveryTime: data['delivery']?.toString() ?? 'N/A',
-            ratings: data['ratings']?.toString() ?? 'No Ratings',
-            images: List<String>.from(data['images'] ?? []),
-            extraFields: Map<String, dynamic>.from(data['extraFields'] ?? {}),
             pid: data['pid']?.toString() ?? 'No product ID',
+            name: data['name']?.toString() ?? 'No name',
+            brand: data['brand']?.toString() ?? 'No brand',
+            category: data['category']?.toString() ?? 'No category',
+            price: (data['price'] is num) ? (data['price'] as num).toDouble() : 0.0,
+            description: data['description']?.toString() ?? 'No description',
+            deliveryTime: data['deliveryTime']?.toString() ?? 'N/A',
+            stockQuantity: data['stockQuantity'] ?? 0,
+            images: List<String>.from(data['images'] ?? []),
+            keywords: List<String>.from(data['keywords'] ?? []),
           );
         }).toList();
       });
@@ -119,81 +107,6 @@ class _HomePage extends State<HomePage> {
       print("✅ Loaded ${products.length} products from Firestore");
     } catch (e) {
       print("❌ Failed to load products from Firestore: $e");
-    }
-  }
-
-  Future<void>? uploadProductsToFirestore() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser?.uid;
-      if (user == null) {
-        print("User not logged in!");
-        return;
-      }
-
-      // Get all existing products for this seller
-      final QuerySnapshot existingProducts = await FirebaseFirestore.instance
-          .collection('products')
-          .where('sellerId', isEqualTo: user)
-          .get();
-
-      // Create a map of existing products by PID for quick lookup
-      Map<String, DocumentSnapshot> existingProductMap = {};
-      for (var doc in existingProducts.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final pid = data['pid']?.toString();
-        if (pid != null) {
-          existingProductMap[pid] = doc;
-        }
-      }
-
-      int updatedCount = 0;
-      int addedCount = 0;
-
-      for (int i = 0; i < products.length; i++) {
-        final product = products[i];
-        final cleanedExtraFields =
-            Map<String, dynamic>.from(product.extraFields)..removeWhere(
-              (key, value) => value == null || value.toString().isEmpty,
-            );
-
-        final productData = {
-          'sellerId': user,
-          'pid': product.pid,
-          'title': product.title,
-          'images': product.images,
-          'ratings': product.ratings,
-          'price': product.price,
-          'delivery': product.deliveryTime,
-          if (cleanedExtraFields.isNotEmpty)
-            'extraFields': cleanedExtraFields, // Only add if not empty
-        };
-
-        // Check if product already exists
-        if (existingProductMap.containsKey(product.pid)) {
-          // Update existing product
-          final existingDoc = existingProductMap[product.pid]!;
-          await existingDoc.reference.update(productData);
-          updatedCount++;
-          print(
-            "✅ Product '${product.title}' (PID: ${product.pid}) updated in Firestore.",
-          );
-        } else {
-          // Add new product
-          await FirebaseFirestore.instance
-              .collection('products')
-              .add(productData);
-          addedCount++;
-          print(
-            "✅ Product '${product.title}' (PID: ${product.pid}) added to Firestore.",
-          );
-        }
-      }
-
-      print(
-        "✅ Upload complete! Added: $addedCount, Updated: $updatedCount products.",
-      );
-    } catch (e) {
-      print("❌ Upload failed: $e");
     }
   }
 
@@ -252,9 +165,7 @@ class _HomePage extends State<HomePage> {
     return double.tryParse(str) ?? 0.0;
   }
 
-  Future<void> uploadExcelProductsToFirestore(
-    List<Map<String, dynamic>> excelData,
-  ) async {
+  Future<void> uploadExcelProductsToFirestore(List<Map<String, dynamic>> excelData,) async {
     try {
       final user = FirebaseAuth.instance.currentUser?.uid;
       if (user == null) {
@@ -283,39 +194,31 @@ class _HomePage extends State<HomePage> {
 
       for (var productMap in excelData) {
         // Extract known fields
-        final title = productMap['Title']?.toString() ?? 'No Title';
-        final price = _parsePrice(productMap['Price']);
-        final deliveryTime = productMap['DeliveryTime']?.toString() ?? 'N/A';
-        final ratings = productMap['Rating']?.toString() ?? 'No Ratings';
         final pid = productMap['PID']?.toString() ?? 'No product ID';
-
-        // Split images by comma if multiple provided
+        final name = productMap['Name']?.toString() ?? 'No Name';
+        final brand = productMap['Brand']?.toString() ?? 'No Brand';
+        final category = productMap['Category']?.toString() ?? 'No Category';
+        final price = _parsePrice(productMap['Price']);
+        final description = productMap['Description']?.toString() ?? 'No Description';
+        final deliveryTime = productMap['Delivery Time']?.toString() ?? 'N/A';
+        final stockQuantity = _parsePrice(productMap['Stock Quantity']);
         final imageField = productMap['Images']?.toString() ?? '';
         final images = imageField.split(',').map((e) => e.trim()).toList();
-
-        // Create extraFields by filtering out known ones
-        final extraFieldsRaw = Map<String, dynamic>.from(productMap)
-          ..remove('Title')
-          ..remove('Images')
-          ..remove('Description')
-          ..remove('Price')
-          ..remove('DeliveryTime')
-          ..remove('Ratings')
-          ..remove('PID');
-
-        final cleanedExtraFields = extraFieldsRaw.map((key, value) {
-          return MapEntry(key, value?.toString() ?? '');
-        })..removeWhere((key, value) => value.isEmpty);
+        final keywordsList = productMap['Keywords']?.toString() ?? '';
+        final keywords = keywordsList.split(',').map((e) => e.trim()).toList();
 
         final productData = {
           'sellerId': user,
           'pid': pid,
-          'title': title,
-          'images': images,
-          'ratings': ratings,
+          'name': name,
+          'brand': brand,
+          'category': category,
           'price': price,
-          'delivery': deliveryTime,
-          if (cleanedExtraFields.isNotEmpty) 'extraFields': cleanedExtraFields,
+          'description': description,
+          'deliveryTime': deliveryTime,
+          'stockQuantity': stockQuantity,
+          'keywords' : keywords,
+          'images': images,
         };
 
         // Check if product already exists
@@ -324,14 +227,12 @@ class _HomePage extends State<HomePage> {
           final existingDoc = existingProductMap[pid]!;
           await existingDoc.reference.update(productData);
           updatedCount++;
-          print("✅ Product '$title' (PID: $pid) updated in Firestore.");
+          print("✅ Product '$name' (PID: $pid) updated in Firestore.");
         } else {
           // Add new product
-          await FirebaseFirestore.instance
-              .collection('products')
-              .add(productData);
+          await FirebaseFirestore.instance.collection('products').add(productData);
           addedCount++;
-          print("✅ Product '$title' (PID: $pid) added to Firestore.");
+          print("✅ Product '$name' (PID: $pid) added to Firestore.");
         }
       }
 
@@ -475,7 +376,7 @@ class _HomePage extends State<HomePage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      product.title,
+                                      product.name,
                                       style: TextStyle(
                                         fontSize: 22,
                                         fontWeight: FontWeight.bold,
@@ -489,12 +390,6 @@ class _HomePage extends State<HomePage> {
                                           size: 12,
                                         ),
                                         SizedBox(width: 5),
-                                        Text(
-                                          '${product.ratings}',
-                                          style: TextStyle(
-                                            color: Colors.orange,
-                                          ),
-                                        ),
                                       ],
                                     ),
                                     Text(

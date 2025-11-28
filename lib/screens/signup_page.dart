@@ -60,7 +60,7 @@ class _SignUpPage extends State<SignUpPage> {
               children: [
                 SizedBox(height: 85),
                 Text(
-                  'Sign Up.',
+                  'Sign Up',
                   style: TextStyle(
                     fontSize: 50,
                     fontWeight: FontWeight.bold,
