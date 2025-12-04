@@ -1,5 +1,5 @@
-import 'dart:io';
-import 'dart:math';
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:typed_data';
 import 'package:ecom_app/widgets/auth_button.dart';
 import 'package:file_picker/file_picker.dart';
@@ -32,7 +32,7 @@ class _HomePage extends State<HomePage> {
     final Uint8List? bytes = box.get('excelFile');
 
     if (bytes == null) {
-      print("No Excel file found in Hive.");
+      debugPrint("No Excel file found in Hive.");
       return [];
     }
 
@@ -69,14 +69,14 @@ class _HomePage extends State<HomePage> {
   // Load products directly from Firestore since that's where the actual products are stored
   Future<void> loadProducts() async {
     await loadProductsFromFirestore();
-    print("Products loaded from Firestore: ${products.length}");
+    debugPrint("Products loaded from Firestore: ${products.length}");
   }
 
   Future<void> loadProductsFromFirestore() async {
     try {
       final user = FirebaseAuth.instance.currentUser?.uid;
       if (user == null) {
-        print("User not logged in!");
+        debugPrint("User not logged in!");
         return;
       }
 
@@ -104,9 +104,9 @@ class _HomePage extends State<HomePage> {
         }).toList();
       });
 
-      print("✅ Loaded ${products.length} products from Firestore");
+      debugPrint("✅ Loaded ${products.length} products from Firestore");
     } catch (e) {
-      print("❌ Failed to load products from Firestore: $e");
+      debugPrint("❌ Failed to load products from Firestore: $e");
     }
   }
 
@@ -122,7 +122,7 @@ class _HomePage extends State<HomePage> {
         await loadProducts();
       }
     } else {
-      print("File picking canceled or failed.");
+      debugPrint("File picking canceled or failed.");
     }
   }
 
@@ -169,7 +169,7 @@ class _HomePage extends State<HomePage> {
     try {
       final user = FirebaseAuth.instance.currentUser?.uid;
       if (user == null) {
-        print("User not logged in!");
+        debugPrint("User not logged in!");
         return;
       }
 
@@ -227,20 +227,20 @@ class _HomePage extends State<HomePage> {
           final existingDoc = existingProductMap[pid]!;
           await existingDoc.reference.update(productData);
           updatedCount++;
-          print("✅ Product '$name' (PID: $pid) updated in Firestore.");
+          debugPrint("✅ Product '$name' (PID: $pid) updated in Firestore.");
         } else {
           // Add new product
           await FirebaseFirestore.instance.collection('products').add(productData);
           addedCount++;
-          print("✅ Product '$name' (PID: $pid) added to Firestore.");
+          debugPrint("✅ Product '$name' (PID: $pid) added to Firestore.");
         }
       }
 
-      print(
+      debugPrint(
         "✅ Upload complete! Added: $addedCount, Updated: $updatedCount products.",
       );
     } catch (e) {
-      print("❌ Upload failed: $e");
+      debugPrint("❌ Upload failed: $e");
       rethrow;
     }
   }
@@ -264,7 +264,8 @@ class _HomePage extends State<HomePage> {
                   ),
                 );
               } catch (e) {
-                print("❌ Upload failed: $e");
+                debugPrint("❌ Upload failed: $e");
+                if(!mounted) return;
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
@@ -332,7 +333,7 @@ class _HomePage extends State<HomePage> {
                         try {
                           await pickAndStoreExcel();
                         } catch (e) {
-                          print("❌ Upload failed: $e");
+                          debugPrint("❌ Upload failed: $e");
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('Upload failed: $e')),
                           );
@@ -368,7 +369,7 @@ class _HomePage extends State<HomePage> {
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
+                                  errorBuilder: (_, _, _) =>
                                       Icon(Icons.image),
                                 ),
                                 SizedBox(width: 15),

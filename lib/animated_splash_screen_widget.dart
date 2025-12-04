@@ -8,14 +8,14 @@ class AnimatedSplashScreenWidget extends StatelessWidget {
   const AnimatedSplashScreenWidget({super.key});
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: double.infinity,
       //decoration: BoxDecoration(image: DecorationImage(image: AssetImage('./assets/background.jpg',), fit: BoxFit.cover)),
       child: AnimatedSplashScreen(
         splash: Center(child: Lottie.asset('assets/Animation_123.json')),
         nextScreen: LoginPage(),
         splashIconSize: 200,
-        backgroundColor: Color(121116),
+        backgroundColor: Color(0x00121116),
         duration: 4000,
       ),
     );
