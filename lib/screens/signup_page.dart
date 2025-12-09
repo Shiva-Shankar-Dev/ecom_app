@@ -1,7 +1,6 @@
 import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import '../widgets/auth_text_field.dart';
 import '../widgets/auth_button.dart';
 import 'package:ecom_app/services/auth.dart';
@@ -33,7 +32,7 @@ class _SignUpPage extends State<SignUpPage> {
       print("Signup error: $result");
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(result ?? 'Failed to SignUp')));
+      ).showSnackBar(SnackBar(content: Text(result)));
     }
   }
 

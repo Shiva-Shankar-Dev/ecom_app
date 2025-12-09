@@ -46,6 +46,7 @@ dependencies:
   hive: 
   dotted_border: ^3.1.0
   cloud_firestore: ^4.17.5
+  intl: ^0.19.0
 
 dev_dependencies:
   flutter_launcher_icons:
