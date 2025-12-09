@@ -539,7 +539,7 @@ class _HomePage extends State<HomePage> {
                 'Stock Inventory',
                 style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 10),
+              SizedBox(height: 14),
               Expanded(
                 child: ListView.builder(
                   itemCount: products.length,
@@ -565,9 +565,18 @@ class _HomePage extends State<HomePage> {
                         ),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text('Brand: ${product.brand}'),
-                            Text('Category: ${product.category}'),
+                            Text(
+                              'Brand: ${product.brand}',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                            Text(
+                              'Category: ${product.category}',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           ],
                         ),
                         trailing: Column(
@@ -897,7 +906,7 @@ class _HomePage extends State<HomePage> {
                 );
               } catch (e) {
                 debugPrint("❌ Upload failed: $e");
-                if(!mounted) return;
+                if (!mounted) return;
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
@@ -938,115 +947,29 @@ class _HomePage extends State<HomePage> {
 
       body: Padding(
         padding: const EdgeInsets.all(10.0),
-        child: products.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Lottie.asset('assets/post.json', width: 200, height: 200),
-                    SizedBox(height: 20),
-                    Text(
-                      'No Products Found',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      'Please add products to get started.',
-                      style: TextStyle(fontSize: 16),
-                    ),
-                    SizedBox(height: 20),
-                    AuthButton(
-                      hintText: 'Add Products',
-                      onPressed: () async {
-                        try {
-                          await pickAndStoreExcel();
-                        } catch (e) {
-                          debugPrint("❌ Upload failed: $e");
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Upload failed: $e')),
-                          );
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Your Products',
-                    style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 10),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: products.length,
-                      itemBuilder: (context, index) {
-                        final product = products[index];
-                        return Card(
-                          margin: EdgeInsets.symmetric(vertical: 10),
-
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 20, top: 20),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Image.network(
-                                  product.images.first,
-                                  width: 100,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      Icon(Icons.image),
-                                ),
-                                SizedBox(width: 15),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      product.name,
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.star,
-                                          color: Colors.orange,
-                                          size: 12,
-                                        ),
-                                        SizedBox(width: 5),
-                                      ],
-                                    ),
-                                    Text(
-                                      '${product.price}',
-                                      style: TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Delivery Time | ${product.deliveryTime}',
-                                      style: TextStyle(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [_buildProductsTab(), _buildStockTab(), _buildOrdersTab()],
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag),
+            label: 'Products',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory),
+            label: 'Stock Available',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment),
+            label: 'Order Placed',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: Colors.blue,
+        onTap: _onItemTapped,
       ),
     );
   }
