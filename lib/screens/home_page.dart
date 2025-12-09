@@ -95,19 +95,31 @@ class _HomePage extends State<HomePage> {
         products = existingProducts.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
 
+          final variants = <ProductVariant>[];
+          if (data['variants'] != null) {
+            for (final variantData in data['variants']) {
+              variants.add(
+                ProductVariant.fromMap(variantData as Map<String, dynamic>),
+              );
+            }
+          }
+
           return Product(
             pid: data['pid']?.toString() ?? 'No product ID',
             name: data['name']?.toString() ?? 'No name',
             brand: data['brand']?.toString() ?? 'No brand',
             category: data['category']?.toString() ?? 'No category',
-            price: (data['price'] is num)
+            basePrice: (data['price'] is num)
                 ? (data['price'] as num).toDouble()
+                : (data['basePrice'] is num)
+                ? (data['basePrice'] as num).toDouble()
                 : 0.0,
             description: data['description']?.toString() ?? 'No description',
             deliveryTime: data['deliveryTime']?.toString() ?? 'N/A',
             stockQuantity: data['stockQuantity'] ?? 0,
             images: List<String>.from(data['images'] ?? []),
             keywords: List<String>.from(data['keywords'] ?? []),
+            variants: variants,
           );
         }).toList();
       });
@@ -128,6 +140,16 @@ class _HomePage extends State<HomePage> {
         await uploadExcelProductsToFirestore(excelData);
         // Reload products from Firestore after upload
         await loadProducts();
+
+        // Show upload summary
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Excel file processed successfully! Check console for details.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } else {
       debugPrint("File picking canceled or failed.");
@@ -136,13 +158,72 @@ class _HomePage extends State<HomePage> {
 
   Future<List<Map<String, dynamic>>> processExcelFile(Uint8List bytes) async {
     final excel = Excel.decodeBytes(bytes);
-    final sheet = excel.tables[excel.tables.keys.first]; // First sheet
 
-    if (sheet == null) return [];
+    // Debug: Print all available sheet names
+    debugPrint("📋 Available Excel sheets: ${excel.tables.keys.toList()}");
 
+    // Get Products sheet (try different possible names)
+    Sheet? productsSheet;
+    for (String sheetName in ['Products', 'Product', 'products', 'PRODUCTS']) {
+      if (excel.tables.containsKey(sheetName)) {
+        productsSheet = excel.tables[sheetName];
+        debugPrint("✅ Found Products sheet: $sheetName");
+        break;
+      }
+    }
+
+    // If no "Products" sheet found, use the first sheet
+    if (productsSheet == null) {
+      productsSheet = excel.tables[excel.tables.keys.first];
+      debugPrint(
+        "⚠️ No Products sheet found, using first sheet: ${excel.tables.keys.first}",
+      );
+    }
+
+    if (productsSheet == null) return [];
+
+    // Get Variants sheet (try different possible names)
+    Sheet? variantsSheet;
+    for (String sheetName in ['Variants', 'Variant', 'variants', 'VARIANTS']) {
+      if (excel.tables.containsKey(sheetName)) {
+        variantsSheet = excel.tables[sheetName];
+        debugPrint("✅ Found Variants sheet: $sheetName");
+        break;
+      }
+    }
+
+    if (variantsSheet == null) {
+      debugPrint(
+        "⚠️ No Variants sheet found. Available sheets: ${excel.tables.keys.toList()}",
+      );
+    }
+
+    final products = await _processProductsSheet(productsSheet);
+    debugPrint("📦 Processed ${products.length} products from Products sheet");
+
+    if (variantsSheet != null) {
+      final variants = await _processVariantsSheet(variantsSheet);
+      debugPrint(
+        "🎨 Processed ${variants.length} variants from Variants sheet",
+      );
+      _attachVariantsToProducts(products, variants);
+
+      // Debug: Check how many products have variants after attachment
+      int productsWithVariants = products
+          .where((p) => (p['variants'] as List).isNotEmpty)
+          .length;
+      debugPrint("🔗 ${productsWithVariants} products have variants attached");
+    }
+
+    return products;
+  }
+
+  Future<List<Map<String, dynamic>>> _processProductsSheet(Sheet sheet) async {
     final headers = sheet.rows.first
         .map((cell) => cell?.value?.toString() ?? "")
         .toList();
+    debugPrint("📊 Products sheet headers: $headers");
+
     final products = <Map<String, dynamic>>[];
 
     for (var i = 1; i < sheet.rows.length; i++) {
@@ -153,10 +234,169 @@ class _HomePage extends State<HomePage> {
         product[headers[j]] = row[j]?.value;
       }
 
+      // Initialize variants list
+      product['variants'] = <Map<String, dynamic>>[];
+
+      // Debug: Print product ID for tracking
+      final productId = product['PID']?.toString();
+      debugPrint(
+        "📦 Processing product: ${product['Name']} with PID: $productId",
+      );
+
       products.add(product);
     }
 
     return products;
+  }
+
+  Future<List<Map<String, dynamic>>> _processVariantsSheet(Sheet sheet) async {
+    final headers = sheet.rows.first
+        .map((cell) => cell?.value?.toString() ?? "")
+        .toList();
+    debugPrint("🎨 Variants sheet headers: $headers");
+
+    final variants = <Map<String, dynamic>>[];
+
+    for (var i = 1; i < sheet.rows.length; i++) {
+      final row = sheet.rows[i];
+      final variant = <String, dynamic>{};
+
+      for (var j = 0; j < headers.length; j++) {
+        variant[headers[j]] = row[j]?.value;
+      }
+
+      // Debug: Print variant details
+      final variantName =
+          variant['Variant_Name']?.toString() ?? variant['Name']?.toString();
+      final parentId =
+          variant['Parent_ID']?.toString() ?? variant['ParentID']?.toString();
+      final priceModifier =
+          variant['Price_Modifier'] ??
+          variant['PriceModifier'] ??
+          variant['Modifier'];
+      debugPrint(
+        "🎨 Processing variant: $variantName, Parent_ID: $parentId, Price_Modifier: $priceModifier",
+      );
+
+      variants.add(variant);
+    }
+
+    return variants;
+  }
+
+  void _attachVariantsToProducts(
+    List<Map<String, dynamic>> products,
+    List<Map<String, dynamic>> variants,
+  ) {
+    debugPrint(
+      "🔗 Starting to attach ${variants.length} variants to ${products.length} products",
+    );
+
+    for (final variant in variants) {
+      final parentId =
+          variant['Parent_ID']?.toString() ?? variant['ParentID']?.toString();
+      debugPrint(
+        "🎯 Processing variant: ${variant['Variant_Name'] ?? variant['Name']} with Parent_ID: $parentId",
+      );
+
+      if (parentId != null) {
+        bool attached = false;
+        for (final product in products) {
+          final productId = product['PID']?.toString();
+          debugPrint(
+            "   Checking product PID: $productId against Parent_ID: $parentId",
+          );
+
+          if (productId == parentId) {
+            (product['variants'] as List<Map<String, dynamic>>).add(variant);
+            debugPrint("   ✅ Variant attached to product: ${product['Name']}");
+            attached = true;
+            break;
+          }
+        }
+
+        if (!attached) {
+          debugPrint("   ❌ No matching product found for Parent_ID: $parentId");
+        }
+      } else {
+        debugPrint("   ⚠️ Variant has no Parent_ID");
+      }
+    }
+  }
+
+  // Dynamic attribute extraction method
+  Map<String, String> _extractDynamicAttributes(Map<String, dynamic> variant) {
+    final attributes = <String, String>{};
+
+    debugPrint(
+      "🔍 Extracting attributes from variant keys: ${variant.keys.toList()}",
+    );
+
+    // System/reserved fields that should not be treated as attributes
+    final systemFields = {
+      'Variant_ID', 'VariantID', 'Parent_ID', 'ParentID',
+      'Variant_Name', 'Name', 'Price', 'Variant_Price',
+      'Price_Modifier', 'PriceModifier', 'Modifier',
+      'price_modifier', 'pricemodifier', 'modifier', // lowercase variants
+      'PRICE_MODIFIER', 'PRICEMODIFIER', 'MODIFIER', // uppercase variants
+      'Stock', 'Quantity', 'Stock_Quantity', 'Image',
+      'stock', 'quantity', 'stock_quantity', 'image', // lowercase variants
+    };
+
+    // Convert any non-system field with a value into an attribute
+    for (final entry in variant.entries) {
+      final key = entry.key;
+      // Check both exact match and case-insensitive match for system fields
+      final isSystemField =
+          systemFields.contains(key) ||
+          systemFields.contains(key.toLowerCase()) ||
+          systemFields.contains(key.toUpperCase());
+
+      if (!isSystemField) {
+        final cleanValue = _cleanString(entry.value);
+        if (cleanValue != null && cleanValue.isNotEmpty) {
+          // Format the attribute key nicely
+          String attributeKey = key;
+          if (attributeKey.contains('_')) {
+            attributeKey = attributeKey
+                .split('_')
+                .map(
+                  (word) =>
+                      word[0].toUpperCase() + word.substring(1).toLowerCase(),
+                )
+                .join(' ');
+          }
+          attributes[attributeKey] = cleanValue;
+          debugPrint("   ✅ Added attribute: '$attributeKey' = '$cleanValue'");
+        }
+      } else {
+        debugPrint("   ❌ Excluded system field: '$key'");
+      }
+    }
+
+    return attributes;
+  }
+
+  // Helper method to clean string values and handle nulls
+  String? _cleanString(dynamic value) {
+    if (value == null) return null;
+    if (value is String && value.trim().isEmpty) return null;
+    final cleaned = value.toString().trim();
+    return cleaned.isEmpty ? null : cleaned;
+  }
+
+  // Helper method to parse integers with better null handling
+  int _parseInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.round();
+
+    final str = value.toString().trim();
+    if (str.isEmpty) return 0;
+
+    // Remove non-numeric characters except decimal point for parsing
+    final cleanStr = str.replaceAll(RegExp(r'[^\d]'), '');
+    return int.tryParse(cleanStr) ?? 0;
   }
 
   double _parsePrice(dynamic value) {
@@ -216,20 +456,94 @@ class _HomePage extends State<HomePage> {
       int addedCount = 0;
 
       for (var productMap in excelData) {
-        // Extract known fields
-        final pid = productMap['PID']?.toString() ?? 'No product ID';
-        final name = productMap['Name']?.toString() ?? 'No Name';
-        final brand = productMap['Brand']?.toString() ?? 'No Brand';
-        final category = productMap['Category']?.toString() ?? 'No Category';
+        // Extract known fields with better null handling
+        final pid = _cleanString(productMap['PID']) ?? 'No product ID';
+        final name = _cleanString(productMap['Name']) ?? 'No Name';
+        final brand = _cleanString(productMap['Brand']) ?? 'No Brand';
+        final category = _cleanString(productMap['Category']) ?? 'No Category';
         final price = _parsePrice(productMap['Price']);
         final description =
-            productMap['Description']?.toString() ?? 'No Description';
-        final deliveryTime = productMap['Delivery Time']?.toString() ?? 'N/A';
-        final stockQuantity = _parsePrice(productMap['Stock Quantity']);
-        final imageField = productMap['Images']?.toString() ?? '';
-        final images = imageField.split(',').map((e) => e.trim()).toList();
-        final keywordsList = productMap['Keywords']?.toString() ?? '';
-        final keywords = keywordsList.split(',').map((e) => e.trim()).toList();
+            _cleanString(productMap['Description']) ?? 'No Description';
+        final deliveryTime = _cleanString(productMap['Delivery Time']) ?? 'N/A';
+
+        // Calculate total stock from variants if available, otherwise use product stock
+        int totalStock = 0;
+        List<String> allImages = [];
+
+        // Process variants first to get images and calculate total stock
+        final variantsList = <Map<String, dynamic>>[];
+        if (productMap['variants'] != null &&
+            (productMap['variants'] as List).isNotEmpty) {
+          for (final variant in productMap['variants']) {
+            final variantStock = _parseInt(
+              variant['Stock'] ??
+                  variant['Quantity'] ??
+                  variant['Stock_Quantity'],
+            );
+            totalStock += variantStock;
+
+            // Collect variant images
+            final variantImage = _cleanString(variant['Image']);
+            if (variantImage != null && variantImage.isNotEmpty) {
+              allImages.add(variantImage);
+            }
+
+            // Calculate variant price using base price + modifier
+            final priceModifier = _parsePrice(
+              variant['Price_Modifier'] ??
+                  variant['PriceModifier'] ??
+                  variant['Modifier'] ??
+                  variant['Price'] ??
+                  variant['Variant_Price'] ??
+                  0,
+            );
+            final variantPrice = price + priceModifier;
+
+            variantsList.add({
+              'variantId':
+                  _cleanString(variant['Variant_ID']) ??
+                  _cleanString(variant['VariantID']) ??
+                  '',
+              'name':
+                  _cleanString(variant['Variant_Name']) ??
+                  _cleanString(variant['Name']) ??
+                  '',
+              'price': variantPrice,
+              'basePrice': price,
+              'priceModifier': priceModifier,
+              'stockQuantity': variantStock,
+              'attributes': _extractDynamicAttributes(variant),
+              'image': variantImage,
+            });
+          }
+        } else {
+          // No variants, use product-level stock
+          totalStock = _parseInt(productMap['Stock Quantity']);
+        }
+
+        // Handle product images - prefer variant images if available
+        final productImageField = _cleanString(productMap['Images']);
+        if (productImageField != null && productImageField.isNotEmpty) {
+          final productImages = productImageField
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .toList();
+          allImages.insertAll(0, productImages); // Product images first
+        }
+
+        // Remove duplicates and empty images
+        final images = allImages
+            .toSet()
+            .where((img) => img.isNotEmpty)
+            .toList();
+
+        final keywordsList = _cleanString(productMap['Keywords']) ?? '';
+        final keywords = keywordsList
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
 
         final productData = {
           'sellerId': user,
@@ -237,13 +551,47 @@ class _HomePage extends State<HomePage> {
           'name': name,
           'brand': brand,
           'category': category,
-          'price': price,
+          'price': price, // Keep as basePrice for backwards compatibility
+          'basePrice': price,
           'description': description,
           'deliveryTime': deliveryTime,
-          'stockQuantity': stockQuantity,
-          'keywords': keywords,
-          'images': images,
+          'stockQuantity':
+              totalStock, // Total stock from variants or product level
+          'keywords': keywords.isNotEmpty
+              ? keywords
+              : [
+                  name.toLowerCase(),
+                  brand.toLowerCase(),
+                  category.toLowerCase(),
+                ].where((k) => k.isNotEmpty).toList(),
+          'images': images, // Combined images from variants and product
+          'variants': variantsList,
+          'hasVariants': variantsList.isNotEmpty,
         };
+
+        debugPrint("📦 Product data for $name:");
+        debugPrint("   - PID: $pid");
+        debugPrint(
+          "   - Total Stock: $totalStock (from ${variantsList.isNotEmpty ? 'variants' : 'product'})",
+        );
+        debugPrint(
+          "   - Images: ${images.length} (${images.take(2).join(', ')}${images.length > 2 ? '...' : ''})",
+        );
+        debugPrint("   - Variants: ${variantsList.length}");
+        if (variantsList.isNotEmpty) {
+          for (int i = 0; i < variantsList.length; i++) {
+            final v = variantsList[i];
+            debugPrint(
+              "     Variant ${i + 1}: ${v['name']} (Stock: ${v['stockQuantity']}, Base: ₹${v['basePrice']}, Modifier: ${v['priceModifier'] >= 0 ? '+' : ''}₹${v['priceModifier']}, Final: ₹${v['price']})",
+            );
+            if (v['attributes'] != null &&
+                (v['attributes'] as Map).isNotEmpty) {
+              debugPrint("       Attributes: ${v['attributes']}");
+            } else {
+              debugPrint("       No attributes found");
+            }
+          }
+        }
 
         // Check if product already exists
         if (existingProductMap.containsKey(pid)) {
@@ -453,58 +801,7 @@ class _HomePage extends State<HomePage> {
                   itemCount: products.length,
                   itemBuilder: (context, index) {
                     final product = products[index];
-                    return Card(
-                      margin: EdgeInsets.symmetric(vertical: 10),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 20, top: 20),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Image.network(
-                              product.images.first,
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(Icons.image),
-                            ),
-                            SizedBox(width: 15),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product.name,
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Row(
-                                  children: [
-                                    Icon(
-                                      Icons.star,
-                                      color: Colors.orange,
-                                      size: 12,
-                                    ),
-                                    SizedBox(width: 5),
-                                  ],
-                                ),
-                                Text(
-                                  '\$${product.price}',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                Text(
-                                  'Delivery Time | ${product.deliveryTime}',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return _buildProductCard(product);
                   },
                 ),
               ),
@@ -512,8 +809,256 @@ class _HomePage extends State<HomePage> {
           );
   }
 
+  Widget _buildProductCard(Product product) {
+    // Get the best image to display (prefer variant images if main product has none)
+    String? displayImage;
+    if (product.images.isNotEmpty) {
+      displayImage = product.images.first;
+    } else if (product.variants.isNotEmpty) {
+      // Try to get image from first variant that has one
+      for (final variant in product.variants) {
+        if (variant.image != null && variant.image!.isNotEmpty) {
+          displayImage = variant.image;
+          break;
+        }
+      }
+    }
+
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 10),
+      child: ExpansionTile(
+        leading: displayImage != null && displayImage.isNotEmpty
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  displayImage,
+                  width: 60,
+                  height: 60,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.image, color: Colors.grey[600]),
+                  ),
+                ),
+              )
+            : Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.shopping_bag, color: Colors.grey[600]),
+              ),
+        title: Text(
+          product.name,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product.priceRange,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.green[700],
+              ),
+            ),
+            Text('${product.brand} • ${product.category}'),
+            if (product.variants.isNotEmpty)
+              Text(
+                '${product.variants.length} variant${product.variants.length > 1 ? 's' : ''}',
+                style: TextStyle(color: Colors.blue[600], fontSize: 12),
+              ),
+          ],
+        ),
+        children: [
+          if (product.variants.isNotEmpty) ...[
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Available Variants:',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 8),
+                  ...product.variants.map(
+                    (variant) => _buildVariantItem(variant),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Base Price: ₹${product.basePrice.toStringAsFixed(2)}'),
+                  Text('Stock: ${product.stockQuantity}'),
+                  Text('Delivery: ${product.deliveryTime}'),
+                  SizedBox(height: 8),
+                  Text(
+                    product.description,
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVariantItem(ProductVariant variant) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          // Variant image (if available)
+          if (variant.image != null && variant.image!.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                variant.image!,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(Icons.image, size: 20, color: Colors.grey[500]),
+                ),
+              ),
+            ),
+            SizedBox(width: 12),
+          ],
+
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  variant.name.isNotEmpty ? variant.name : 'Unnamed Variant',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (variant.attributes.isNotEmpty) ...[
+                  SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: variant.attributes.entries
+                        .where((attr) => attr.value.isNotEmpty)
+                        .map(
+                          (attr) => Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.blue[200]!),
+                            ),
+                            child: Text(
+                              '${attr.key}: ${attr.value}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue[800],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(Icons.inventory_2, size: 14, color: Colors.grey[600]),
+                    SizedBox(width: 4),
+                    Text(
+                      'Stock: ${variant.stockQuantity}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: variant.stockQuantity > 0
+                            ? Colors.green[600]
+                            : Colors.red[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₹${variant.price.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                ),
+              ),
+              if (variant.stockQuantity == 0)
+                Text(
+                  'Out of Stock',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.red[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStockTab() {
-    return products.isEmpty
+    // Get all variants from all products for individual display
+    List<Map<String, dynamic>> allVariants = [];
+
+    for (final product in products) {
+      if (product.variants.isNotEmpty) {
+        // Add each variant with product context
+        for (final variant in product.variants) {
+          allVariants.add({'product': product, 'variant': variant});
+        }
+      } else {
+        // For products without variants, treat the product itself as a variant
+        allVariants.add({
+          'product': product,
+          'variant': null, // No variant, use product data
+        });
+      }
+    }
+
+    return allVariants.isEmpty
         ? Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -539,71 +1084,201 @@ class _HomePage extends State<HomePage> {
                 'Stock Inventory',
                 style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
               ),
+              SizedBox(height: 10),
+              Text(
+                'Individual Variants (${allVariants.length} items)',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
               SizedBox(height: 14),
               Expanded(
                 child: ListView.builder(
-                  itemCount: products.length,
+                  itemCount: allVariants.length,
                   itemBuilder: (context, index) {
-                    final product = products[index];
-                    return Card(
-                      margin: EdgeInsets.symmetric(vertical: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: product.stockQuantity > 10
-                              ? Colors.green
-                              : product.stockQuantity > 0
-                              ? Colors.orange
-                              : Colors.red,
-                          child: Icon(Icons.inventory, color: Colors.white),
-                        ),
-                        title: Text(
-                          product.name,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Brand: ${product.brand}',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            Text(
-                              'Category: ${product.category}',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ],
-                        ),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '${product.stockQuantity}',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: product.stockQuantity > 10
-                                    ? Colors.green
-                                    : product.stockQuantity > 0
-                                    ? Colors.orange
-                                    : Colors.red,
-                              ),
-                            ),
-                            Text('in stock', style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    );
+                    final item = allVariants[index];
+                    final product = item['product'] as Product;
+                    final variant = item['variant'] as ProductVariant?;
+
+                    return _buildStockVariantCard(product, variant);
                   },
                 ),
               ),
             ],
           );
+  }
+
+  Widget _buildStockVariantCard(Product product, ProductVariant? variant) {
+    // Determine stock quantity and other details
+    final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
+    final variantName = variant?.name ?? 'Base Product';
+    final price = variant?.price ?? product.basePrice;
+    final image =
+        variant?.image ??
+        (product.images.isNotEmpty ? product.images.first : null);
+
+    // Determine stock status color
+    Color stockColor;
+    if (stockQuantity > 10) {
+      stockColor = Colors.green;
+    } else if (stockQuantity > 0) {
+      stockColor = Colors.orange;
+    } else {
+      stockColor = Colors.red;
+    }
+
+    return Card(
+      margin: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      child: Padding(
+        padding: EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Product/Variant Image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: image != null && image.isNotEmpty
+                  ? Image.network(
+                      image,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.image, color: Colors.grey[600]),
+                      ),
+                    )
+                  : Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.inventory_2, color: Colors.grey[600]),
+                    ),
+            ),
+            SizedBox(width: 12),
+
+            // Product and Variant Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (variant != null) ...[
+                    SizedBox(height: 2),
+                    Text(
+                      variantName,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Text(
+                        '${product.brand}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        '₹${price.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Variant attributes (if any)
+                  if (variant != null && variant.attributes.isNotEmpty) ...[
+                    SizedBox(height: 4),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 2,
+                      children: variant.attributes.entries
+                          .take(2) // Show only first 2 attributes to save space
+                          .map(
+                            (attr) => Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.blue[200]!),
+                              ),
+                              child: Text(
+                                '${attr.key}: ${attr.value}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.blue[800],
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            // Stock Status
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: stockColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: stockColor),
+                  ),
+                  child: Text(
+                    '$stockQuantity',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: stockColor,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  stockQuantity == 0
+                      ? 'Out of Stock'
+                      : stockQuantity == 1
+                      ? '1 left'
+                      : 'in stock',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: stockColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildOrdersTab() {
