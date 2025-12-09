@@ -102,7 +102,7 @@ class _LoginPage extends State<LoginPage> {
                           children: [
                             TextSpan(
                               text: 'Mobile instead?',
-                              style: TextStyle(color: colorPallete.color1),
+                              style: TextStyle(color: ColorPallete.color1),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () {
                                   Navigator.pushNamed(context, '/mobile');
@@ -127,7 +127,7 @@ class _LoginPage extends State<LoginPage> {
                           children: [
                             TextSpan(
                               text: 'Sign Up',
-                              style: TextStyle(color: colorPallete.color1),
+                              style: TextStyle(color: ColorPallete.color1),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () {
                                   Navigator.pushNamed(context, '/signup');

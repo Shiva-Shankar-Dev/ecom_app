@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +8,8 @@ import '../widgets/auth_button.dart';
 import 'package:ecom_app/services/auth.dart';
 
 class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
+
   @override
   State<SignUpPage> createState() => _SignUpPage();
 }
@@ -26,16 +30,17 @@ class _SignUpPage extends State<SignUpPage> {
       mobile: mobileController.text,
     );
     if (result == null) {
-      print("Signup success!");
+      debugPrint("Signup success!");
       Navigator.pushNamed(context, '/home');
     } else {
-      print("Signup error: $result");
+      debugPrint("Signup error: $result");
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(result)));
     }
   }
 
+  @override
   void dispose() {
     super.dispose();
     fullNameController.dispose();
@@ -131,7 +136,7 @@ class _SignUpPage extends State<SignUpPage> {
                     children: [
                       TextSpan(
                         text: 'Login',
-                        style: TextStyle(color: colorPallete.color1),
+                        style: TextStyle(color: ColorPallete.color1),
                         recognizer: TapGestureRecognizer()
                           ..onTap = () {
                             Navigator.pushNamed(context, '/login');

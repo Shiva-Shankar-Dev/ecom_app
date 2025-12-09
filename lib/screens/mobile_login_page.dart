@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:ecom_app/colorPallete/color_pallete.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,10 +31,10 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
         phoneNumber: phone,
         verificationCompleted: (PhoneAuthCredential credential) async {
           // Auto-sign in flow (optional)
-          print("Auto verification completed");
+          debugPrint("Auto verification completed");
         },
         verificationFailed: (FirebaseAuthException e) {
-          print("Verification failed: ${e.code} - ${e.message}");
+          debugPrint("Verification failed: ${e.code} - ${e.message}");
           String errorMessage = e.message ?? 'Verification failed';
 
           // Handle specific reCAPTCHA errors
@@ -51,7 +53,7 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
           setState(() => _isSending = false);
         },
         codeSent: (String verificationId, int? resendToken) {
-          print("OTP sent successfully");
+          debugPrint("OTP sent successfully");
           setState(() => _isSending = false);
           Navigator.pushNamed(
             context,
@@ -60,13 +62,13 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
           );
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          print("Auto retrieval timeout");
+          debugPrint("Auto retrieval timeout");
           setState(() => _isSending = false);
         },
         timeout: Duration(seconds: 60),
       );
     } catch (e) {
-      print("Error sending OTP: $e");
+      debugPrint("Error sending OTP: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to send OTP. Please try again.')),
       );
@@ -80,7 +82,7 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         foregroundColor: Colors.white,
-        backgroundColor: colorPallete.color4,
+        backgroundColor: ColorPallete.color4,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -104,7 +106,7 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(
-                      color: colorPallete.color1,
+                      color: ColorPallete.color1,
                       width: 3,
                     ),
                   ),
@@ -119,7 +121,7 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [colorPallete.color1, colorPallete.color2],
+                    colors: [ColorPallete.color1, ColorPallete.color2],
                     begin: Alignment.bottomLeft,
                     end: Alignment.topRight,
                   ),
@@ -128,8 +130,8 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     fixedSize: const Size(320, 55),
-                    shadowColor: colorPallete.color4,
-                    backgroundColor: colorPallete.color4,
+                    shadowColor: ColorPallete.color4,
+                    backgroundColor: ColorPallete.color4,
                   ),
                   onPressed: _isSending ? null : _sendOtp,
                   child: _isSending

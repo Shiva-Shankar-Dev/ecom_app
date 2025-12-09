@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -56,7 +58,7 @@ class _OtpPageState extends State<OtpPage> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text('Verify OTP'),
-        backgroundColor: colorPallete.color4,
+        backgroundColor: ColorPallete.color4,
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -85,7 +87,7 @@ class _OtpPageState extends State<OtpPage> {
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide(
-                      color: colorPallete.color1,
+                      color: ColorPallete.color1,
                       width: 3,
                     ),
                   ),
@@ -95,7 +97,7 @@ class _OtpPageState extends State<OtpPage> {
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [colorPallete.color1, colorPallete.color2],
+                    colors: [ColorPallete.color1, ColorPallete.color2],
                     begin: Alignment.bottomLeft,
                     end: Alignment.topRight,
                   ),
@@ -104,8 +106,8 @@ class _OtpPageState extends State<OtpPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     fixedSize: const Size(320, 55),
-                    shadowColor: colorPallete.color4,
-                    backgroundColor: colorPallete.color4,
+                    shadowColor: ColorPallete.color4,
+                    backgroundColor: ColorPallete.color4,
                   ),
                   onPressed: _isVerifying ? null : _verifyOtp,
                   child: _isVerifying
