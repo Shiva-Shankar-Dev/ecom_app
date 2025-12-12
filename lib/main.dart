@@ -22,7 +22,7 @@ void main() async {
       );
     }
   } catch (e) {
-    debugPrint("🔥 Firebase already initialized or failed: $e");
+    // Firebase already initialized or failed
   }
   runApp(MyApp());
 }

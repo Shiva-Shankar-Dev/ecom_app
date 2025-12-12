@@ -113,12 +113,15 @@ class ProductVariant {
     // Common attribute mappings
     if (map['Color'] != null) attributes['Color'] = map['Color'].toString();
     if (map['Size'] != null) attributes['Size'] = map['Size'].toString();
-    if (map['Storage'] != null)
+    if (map['Storage'] != null){
       attributes['Storage'] = map['Storage'].toString();
+    }
     if (map['Memory'] != null) attributes['Memory'] = map['Memory'].toString();
     if (map['RAM'] != null) attributes['RAM'] = map['RAM'].toString();
-    if (map['Screen_Size'] != null)
+    if (map['Screen_Size'] != null){
       attributes['Screen Size'] = map['Screen_Size'].toString();
+    }
+     
 
     // Add any other custom attributes
     for (final entry in map.entries) {

@@ -31,10 +31,8 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
         phoneNumber: phone,
         verificationCompleted: (PhoneAuthCredential credential) async {
           // Auto-sign in flow (optional)
-          debugPrint("Auto verification completed");
         },
         verificationFailed: (FirebaseAuthException e) {
-          debugPrint("Verification failed: ${e.code} - ${e.message}");
           String errorMessage = e.message ?? 'Verification failed';
 
           // Handle specific reCAPTCHA errors
@@ -53,7 +51,6 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
           setState(() => _isSending = false);
         },
         codeSent: (String verificationId, int? resendToken) {
-          debugPrint("OTP sent successfully");
           setState(() => _isSending = false);
           Navigator.pushNamed(
             context,
@@ -62,7 +59,6 @@ class _MobileLoginPageState extends State<MobileLoginPage> {
           );
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          debugPrint("Auto retrieval timeout");
           setState(() => _isSending = false);
         },
         timeout: Duration(seconds: 60),

@@ -15,7 +15,8 @@ import 'package:lottie/lottie.dart';
 
 import '../models/product.dart';
 import '../models/order.dart';
-import 'package:intl/intl.dart';
+import 'stock_tab.dart';
+import 'orders_tab.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,7 +38,6 @@ class _HomePage extends State<HomePage> {
     final Uint8List? bytes = box.get('excelFile');
 
     if (bytes == null) {
-      debugPrint("No Excel file found in Hive.");
       return [];
     }
 
@@ -75,7 +75,6 @@ class _HomePage extends State<HomePage> {
   // Load products directly from Firestore since that's where the actual products are stored
   Future<void> loadProducts() async {
     await loadProductsFromFirestore();
-    debugPrint("Products loaded from Firestore: ${products.length}");
   }
 
   Future<void> loadProductsFromFirestore() async {
@@ -123,10 +122,8 @@ class _HomePage extends State<HomePage> {
           );
         }).toList();
       });
-
-      debugPrint("✅ Loaded ${products.length} products from Firestore");
     } catch (e) {
-      debugPrint("❌ Failed to load products from Firestore: $e");
+      debugPrint("Failed to load products: $e");
     }
   }
 
@@ -151,97 +148,124 @@ class _HomePage extends State<HomePage> {
           ),
         );
       }
-    } else {
-      debugPrint("File picking canceled or failed.");
     }
   }
 
   Future<List<Map<String, dynamic>>> processExcelFile(Uint8List bytes) async {
     final excel = Excel.decodeBytes(bytes);
 
-    // Debug: Print all available sheet names
-    debugPrint("📋 Available Excel sheets: ${excel.tables.keys.toList()}");
-
     // Get Products sheet (try different possible names)
     Sheet? productsSheet;
-    for (String sheetName in ['Products', 'Product', 'products', 'PRODUCTS']) {
+    final productSheetNames = [
+      'Products',
+      'Product',
+      'products',
+      'PRODUCTS',
+      'Sheet1',
+    ];
+    for (String sheetName in productSheetNames) {
       if (excel.tables.containsKey(sheetName)) {
         productsSheet = excel.tables[sheetName];
-        debugPrint("✅ Found Products sheet: $sheetName");
+
         break;
       }
     }
 
     // If no "Products" sheet found, use the first sheet
-    if (productsSheet == null) {
-      productsSheet = excel.tables[excel.tables.keys.first];
-      debugPrint(
-        "⚠️ No Products sheet found, using first sheet: ${excel.tables.keys.first}",
-      );
+    if (productsSheet == null && excel.tables.isNotEmpty) {
+      final firstSheetName = excel.tables.keys.first;
+      productsSheet = excel.tables[firstSheetName];
     }
 
-    if (productsSheet == null) return [];
+    if (productsSheet == null || productsSheet.rows.isEmpty) {
+      return [];
+    }
 
     // Get Variants sheet (try different possible names)
     Sheet? variantsSheet;
-    for (String sheetName in ['Variants', 'Variant', 'variants', 'VARIANTS']) {
+    final variantSheetNames = [
+      'Variants',
+      'Variant',
+      'variants',
+      'VARIANTS',
+      'Sheet2',
+    ];
+    for (String sheetName in variantSheetNames) {
       if (excel.tables.containsKey(sheetName)) {
         variantsSheet = excel.tables[sheetName];
-        debugPrint("✅ Found Variants sheet: $sheetName");
         break;
       }
     }
 
     if (variantsSheet == null) {
-      debugPrint(
-        "⚠️ No Variants sheet found. Available sheets: ${excel.tables.keys.toList()}",
-      );
+      // No variants sheet found, products will be processed without variants
+    } else if (variantsSheet.rows.isEmpty) {
+      variantsSheet = null;
     }
 
+    // Process Products sheet
     final products = await _processProductsSheet(productsSheet);
-    debugPrint("📦 Processed ${products.length} products from Products sheet");
 
+    // Process Variants sheet if available
     if (variantsSheet != null) {
       final variants = await _processVariantsSheet(variantsSheet);
-      debugPrint(
-        "🎨 Processed ${variants.length} variants from Variants sheet",
-      );
-      _attachVariantsToProducts(products, variants);
-
-      // Debug: Check how many products have variants after attachment
-      int productsWithVariants = products
-          .where((p) => (p['variants'] as List).isNotEmpty)
-          .length;
-      debugPrint("🔗 ${productsWithVariants} products have variants attached");
+      if (variants.isNotEmpty) {
+        _attachVariantsToProducts(products, variants);
+      }
     }
 
     return products;
   }
 
   Future<List<Map<String, dynamic>>> _processProductsSheet(Sheet sheet) async {
+    if (sheet.rows.isEmpty) {
+      return [];
+    }
+
+    // Extract headers from first row
     final headers = sheet.rows.first
-        .map((cell) => cell?.value?.toString() ?? "")
+        .map((cell) => _cleanString(cell?.value) ?? "")
+        .where((header) => header.isNotEmpty)
         .toList();
-    debugPrint("📊 Products sheet headers: $headers");
+
+    if (headers.isEmpty) {
+      return [];
+    }
 
     final products = <Map<String, dynamic>>[];
 
+    // Process each row (skip header row)
     for (var i = 1; i < sheet.rows.length; i++) {
       final row = sheet.rows[i];
+      if (row.isEmpty) continue;
+
       final product = <String, dynamic>{};
 
-      for (var j = 0; j < headers.length; j++) {
-        product[headers[j]] = row[j]?.value;
+      // Map each cell to its corresponding header
+      for (var j = 0; j < headers.length && j < row.length; j++) {
+        final header = headers[j];
+        final cellValue = row[j]?.value;
+
+        if (header.isNotEmpty && cellValue != null) {
+          product[header] = cellValue;
+        }
       }
 
-      // Initialize variants list
+      // Skip empty products
+      if (product.isEmpty) continue;
+
+      // Initialize variants list for this product
       product['variants'] = <Map<String, dynamic>>[];
 
-      // Debug: Print product ID for tracking
-      final productId = product['PID']?.toString();
-      debugPrint(
-        "📦 Processing product: ${product['Name']} with PID: $productId",
-      );
+      // Validate required fields
+      final productId =
+          _cleanString(product['PID']) ?? _cleanString(product['ID']);
+      final productName =
+          _cleanString(product['Name']) ?? _cleanString(product['ProductName']);
+
+      if (productId == null || productName == null) {
+        continue;
+      }
 
       products.add(product);
     }
@@ -250,33 +274,52 @@ class _HomePage extends State<HomePage> {
   }
 
   Future<List<Map<String, dynamic>>> _processVariantsSheet(Sheet sheet) async {
+    if (sheet.rows.isEmpty) {
+      debugPrint("❌ Variants sheet is empty");
+      return [];
+    }
+
+    // Extract headers from first row
     final headers = sheet.rows.first
-        .map((cell) => cell?.value?.toString() ?? "")
+        .map((cell) => _cleanString(cell?.value) ?? "")
+        .where((header) => header.isNotEmpty)
         .toList();
-    debugPrint("🎨 Variants sheet headers: $headers");
+
+    if (headers.isEmpty) {
+      return [];
+    }
 
     final variants = <Map<String, dynamic>>[];
 
+    // Process each row (skip header row)
     for (var i = 1; i < sheet.rows.length; i++) {
       final row = sheet.rows[i];
+      if (row.isEmpty) continue;
+
       final variant = <String, dynamic>{};
 
-      for (var j = 0; j < headers.length; j++) {
-        variant[headers[j]] = row[j]?.value;
+      // Map each cell to its corresponding header
+      for (var j = 0; j < headers.length && j < row.length; j++) {
+        final header = headers[j];
+        final cellValue = row[j]?.value;
+
+        if (header.isNotEmpty && cellValue != null) {
+          variant[header] = cellValue;
+        }
       }
 
-      // Debug: Print variant details
-      final variantName =
-          variant['Variant_Name']?.toString() ?? variant['Name']?.toString();
+      // Skip empty variants
+      if (variant.isEmpty) continue;
+
+      // Validate required fields for variants
       final parentId =
-          variant['Parent_ID']?.toString() ?? variant['ParentID']?.toString();
-      final priceModifier =
-          variant['Price_Modifier'] ??
-          variant['PriceModifier'] ??
-          variant['Modifier'];
-      debugPrint(
-        "🎨 Processing variant: $variantName, Parent_ID: $parentId, Price_Modifier: $priceModifier",
-      );
+          _cleanString(variant['Parent_ID']) ??
+          _cleanString(variant['ParentID']) ??
+          _cleanString(variant['PID']);
+
+      if (parentId == null) {
+        continue;
+      }
 
       variants.add(variant);
     }
@@ -288,38 +331,32 @@ class _HomePage extends State<HomePage> {
     List<Map<String, dynamic>> products,
     List<Map<String, dynamic>> variants,
   ) {
-    debugPrint(
-      "🔗 Starting to attach ${variants.length} variants to ${products.length} products",
-    );
+    if (products.isEmpty || variants.isEmpty) {
+      return;
+    }
+
+    // Create a map of products by PID for faster lookup
+    final productMap = <String, Map<String, dynamic>>{};
+    for (final product in products) {
+      final productId =
+          _cleanString(product['PID']) ?? _cleanString(product['ID']);
+      if (productId != null) {
+        productMap[productId] = product;
+      }
+    }
 
     for (final variant in variants) {
+      // Try multiple possible parent ID field names
       final parentId =
-          variant['Parent_ID']?.toString() ?? variant['ParentID']?.toString();
-      debugPrint(
-        "🎯 Processing variant: ${variant['Variant_Name'] ?? variant['Name']} with Parent_ID: $parentId",
-      );
+          _cleanString(variant['Parent_ID']) ??
+          _cleanString(variant['ParentID']) ??
+          _cleanString(variant['PID']) ??
+          _cleanString(variant['ProductID']);
 
-      if (parentId != null) {
-        bool attached = false;
-        for (final product in products) {
-          final productId = product['PID']?.toString();
-          debugPrint(
-            "   Checking product PID: $productId against Parent_ID: $parentId",
-          );
-
-          if (productId == parentId) {
-            (product['variants'] as List<Map<String, dynamic>>).add(variant);
-            debugPrint("   ✅ Variant attached to product: ${product['Name']}");
-            attached = true;
-            break;
-          }
-        }
-
-        if (!attached) {
-          debugPrint("   ❌ No matching product found for Parent_ID: $parentId");
-        }
-      } else {
-        debugPrint("   ⚠️ Variant has no Parent_ID");
+      if (parentId != null && productMap.containsKey(parentId)) {
+        // Found matching product
+        final product = productMap[parentId]!;
+        (product['variants'] as List<Map<String, dynamic>>).add(variant);
       }
     }
   }
@@ -328,53 +365,137 @@ class _HomePage extends State<HomePage> {
   Map<String, String> _extractDynamicAttributes(Map<String, dynamic> variant) {
     final attributes = <String, String>{};
 
-    debugPrint(
-      "🔍 Extracting attributes from variant keys: ${variant.keys.toList()}",
-    );
-
-    // System/reserved fields that should not be treated as attributes
+    // Comprehensive system/reserved fields that should NOT be treated as attributes
     final systemFields = {
-      'Variant_ID', 'VariantID', 'Parent_ID', 'ParentID',
-      'Variant_Name', 'Name', 'Price', 'Variant_Price',
-      'Price_Modifier', 'PriceModifier', 'Modifier',
-      'price_modifier', 'pricemodifier', 'modifier', // lowercase variants
-      'PRICE_MODIFIER', 'PRICEMODIFIER', 'MODIFIER', // uppercase variants
-      'Stock', 'Quantity', 'Stock_Quantity', 'Image',
-      'stock', 'quantity', 'stock_quantity', 'image', // lowercase variants
+      // ID fields
+      'Variant_ID',
+      'VariantID',
+      'variant_id',
+      'variantid',
+      'VARIANT_ID',
+      'VARIANTID',
+      'Parent_ID', 'ParentID', 'parent_id', 'parentid', 'PARENT_ID', 'PARENTID',
+      'PID',
+      'pid',
+      'ID',
+      'id',
+      'ProductID',
+      'productid',
+      'product_id',
+      'PRODUCTID',
+
+      // Name fields (all variations)
+      'Variant_Name',
+      'VariantName',
+      'variant_name',
+      'variantname',
+      'VARIANT_NAME',
+      'VARIANTNAME',
+      'Variant Name', 'variant name', 'VARIANT NAME',
+      'Name', 'name', 'NAME', 'Title', 'title', 'TITLE',
+      'Variant_Title', 'VariantTitle', 'variant_title', 'varianttitle',
+
+      // Price fields
+      'Price', 'price', 'PRICE',
+      'Variant_Price',
+      'VariantPrice',
+      'variant_price',
+      'variantprice',
+      'VARIANT_PRICE',
+      'VARIANTPRICE',
+      'Price_Modifier', 'PriceModifier', 'price_modifier', 'pricemodifier',
+      'PRICE_MODIFIER', 'PRICEMODIFIER', 'Modifier', 'modifier', 'MODIFIER',
+      'BasePrice', 'base_price', 'baseprice', 'BASE_PRICE',
+
+      // Stock/Quantity fields
+      'Stock', 'stock', 'STOCK',
+      'Quantity', 'quantity', 'QUANTITY',
+      'Stock_Quantity', 'StockQuantity', 'stock_quantity', 'stockquantity',
+      'STOCK_QUANTITY', 'STOCKQUANTITY',
+      'Available', 'available', 'AVAILABLE',
+
+      // Image fields
+      'Image', 'image', 'IMAGE',
+      'Images', 'images', 'IMAGES',
+      'Photo', 'photo', 'PHOTO',
+      'Picture', 'picture', 'PICTURE',
+
+      // Other system fields
+      'SKU', 'sku', 'Sku',
+      'Barcode', 'barcode', 'BARCODE',
+      'Description', 'description', 'DESCRIPTION',
     };
 
-    // Convert any non-system field with a value into an attribute
+    // Convert any non-system field with a valid value into an attribute
     for (final entry in variant.entries) {
-      final key = entry.key;
-      // Check both exact match and case-insensitive match for system fields
+      final key = entry.key.toString();
+      final keyLower = key.toLowerCase();
+      final keyUpper = key.toUpperCase();
+      final keyNormalized = key.replaceAll(' ', '_').toLowerCase();
+
+      // Comprehensive system field check
       final isSystemField =
           systemFields.contains(key) ||
-          systemFields.contains(key.toLowerCase()) ||
-          systemFields.contains(key.toUpperCase());
+          systemFields.contains(keyLower) ||
+          systemFields.contains(keyUpper) ||
+          systemFields.contains(keyNormalized) ||
+          // Pattern-based exclusions
+          keyLower.startsWith('variant') &&
+              (keyLower.contains('name') || keyLower.contains('id')) ||
+          keyLower.startsWith('parent') && keyLower.contains('id') ||
+          keyLower.endsWith('_id') ||
+          keyLower.endsWith('id') ||
+          keyLower.contains('price') ||
+          keyLower.contains('stock') ||
+          keyLower.contains('quantity') ||
+          keyLower.contains('image');
 
       if (!isSystemField) {
         final cleanValue = _cleanString(entry.value);
         if (cleanValue != null && cleanValue.isNotEmpty) {
           // Format the attribute key nicely
-          String attributeKey = key;
-          if (attributeKey.contains('_')) {
-            attributeKey = attributeKey
-                .split('_')
-                .map(
-                  (word) =>
-                      word[0].toUpperCase() + word.substring(1).toLowerCase(),
-                )
-                .join(' ');
-          }
+          String attributeKey = _formatAttributeKey(key);
           attributes[attributeKey] = cleanValue;
-          debugPrint("   ✅ Added attribute: '$attributeKey' = '$cleanValue'");
         }
-      } else {
-        debugPrint("   ❌ Excluded system field: '$key'");
       }
     }
 
     return attributes;
+  }
+
+  // Helper method to format attribute keys nicely
+  String _formatAttributeKey(String key) {
+    // Handle underscores and capitalize properly
+    if (key.contains('_')) {
+      return key
+          .split('_')
+          .map(
+            (word) => word.isNotEmpty
+                ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                : '',
+          )
+          .where((word) => word.isNotEmpty)
+          .join(' ');
+    }
+
+    // Handle camelCase
+    if (key.length > 1 && key.contains(RegExp(r'[a-z][A-Z]'))) {
+      return key
+          .replaceAllMapped(RegExp(r'[A-Z]'), (match) => ' ${match.group(0)}')
+          .split(' ')
+          .map(
+            (word) => word.isNotEmpty
+                ? word[0].toUpperCase() + word.substring(1).toLowerCase()
+                : '',
+          )
+          .where((word) => word.isNotEmpty)
+          .join(' ');
+    }
+
+    // Default: capitalize first letter
+    return key.isNotEmpty
+        ? key[0].toUpperCase() + key.substring(1).toLowerCase()
+        : key;
   }
 
   // Helper method to clean string values and handle nulls
@@ -421,7 +542,6 @@ class _HomePage extends State<HomePage> {
           : 1;
       return price * quantity.toDouble();
     } catch (e) {
-      print("❌ Error calculating item total: $e");
       return 0.0;
     }
   }
@@ -451,9 +571,6 @@ class _HomePage extends State<HomePage> {
           existingProductMap[pid] = doc;
         }
       }
-
-      int updatedCount = 0;
-      int addedCount = 0;
 
       for (var productMap in excelData) {
         // Extract known fields with better null handling
@@ -499,20 +616,59 @@ class _HomePage extends State<HomePage> {
             );
             final variantPrice = price + priceModifier;
 
+            // Extract variant name - check multiple possible field names
+            String variantName = '';
+
+            // Try all possible variant name field variations
+            final possibleVariantNameFields = [
+              'Variant_Name',
+              'VariantName',
+              'variant_name',
+              'variantname',
+              'VARIANT_NAME',
+              'VARIANTNAME',
+              'Variant Name',
+              'variant name',
+              'VARIANT NAME',
+              'Name',
+              'name',
+              'NAME',
+              'Title',
+              'title',
+              'TITLE',
+              'Variant_Title',
+              'VariantTitle',
+              'variant_title',
+              'varianttitle',
+            ];
+
+            for (final fieldName in possibleVariantNameFields) {
+              final value = _cleanString(variant[fieldName]);
+              if (value != null && value.isNotEmpty) {
+                variantName = value;
+
+                break;
+              }
+            }
+
+            if (variantName.isEmpty) {
+              variantName = 'Unnamed Variant';
+            }
+
+            // Extract attributes from variant data
+            final attrs = _extractDynamicAttributes(variant);
+
             variantsList.add({
               'variantId':
                   _cleanString(variant['Variant_ID']) ??
                   _cleanString(variant['VariantID']) ??
                   '',
-              'name':
-                  _cleanString(variant['Variant_Name']) ??
-                  _cleanString(variant['Name']) ??
-                  '',
+              'name': variantName,
               'price': variantPrice,
               'basePrice': price,
               'priceModifier': priceModifier,
               'stockQuantity': variantStock,
-              'attributes': _extractDynamicAttributes(variant),
+              'attributes': attrs,
               'image': variantImage,
             });
           }
@@ -569,50 +725,18 @@ class _HomePage extends State<HomePage> {
           'hasVariants': variantsList.isNotEmpty,
         };
 
-        debugPrint("📦 Product data for $name:");
-        debugPrint("   - PID: $pid");
-        debugPrint(
-          "   - Total Stock: $totalStock (from ${variantsList.isNotEmpty ? 'variants' : 'product'})",
-        );
-        debugPrint(
-          "   - Images: ${images.length} (${images.take(2).join(', ')}${images.length > 2 ? '...' : ''})",
-        );
-        debugPrint("   - Variants: ${variantsList.length}");
-        if (variantsList.isNotEmpty) {
-          for (int i = 0; i < variantsList.length; i++) {
-            final v = variantsList[i];
-            debugPrint(
-              "     Variant ${i + 1}: ${v['name']} (Stock: ${v['stockQuantity']}, Base: ₹${v['basePrice']}, Modifier: ${v['priceModifier'] >= 0 ? '+' : ''}₹${v['priceModifier']}, Final: ₹${v['price']})",
-            );
-            if (v['attributes'] != null &&
-                (v['attributes'] as Map).isNotEmpty) {
-              debugPrint("       Attributes: ${v['attributes']}");
-            } else {
-              debugPrint("       No attributes found");
-            }
-          }
-        }
-
         // Check if product already exists
         if (existingProductMap.containsKey(pid)) {
           // Update existing product
           final existingDoc = existingProductMap[pid]!;
           await existingDoc.reference.update(productData);
-          updatedCount++;
-          debugPrint("✅ Product '$name' (PID: $pid) updated in Firestore.");
         } else {
           // Add new product
           await FirebaseFirestore.instance
               .collection('products')
               .add(productData);
-          addedCount++;
-          debugPrint("✅ Product '$name' (PID: $pid) added to Firestore.");
         }
       }
-
-      debugPrint(
-        "✅ Upload complete! Added: $addedCount, Updated: $updatedCount products.",
-      );
     } catch (e) {
       debugPrint("❌ Upload failed: $e");
       rethrow;
@@ -621,26 +745,25 @@ class _HomePage extends State<HomePage> {
 
   Future<void> loadOrders() async {
     await loadOrdersFromFirestore();
-    print("Orders loaded from Firestore: ${orders.length}");
   }
 
   Future<void> loadOrdersFromFirestore() async {
     try {
       final user = FirebaseAuth.instance.currentUser?.uid;
       if (user == null) {
-        print("User not logged in!");
+        debugPrint("User not logged in!");
         return;
       }
 
-      print("🔍 Current user ID: $user");
-      print("🔍 Attempting to load orders from 'user_orders' collection...");
+      debugPrint("🔍 Current user ID: $user");
+      debugPrint("🔍 Attempting to load orders from 'user_orders' collection...");
 
       // Get all orders and filter by sellerId in items array
       final QuerySnapshot orderSnapshot = await FirebaseFirestore.instance
           .collection('user_orders')
           .get(); // Get all orders first, then filter
 
-      print("🔍 Raw query returned ${orderSnapshot.docs.length} documents");
+      debugPrint("🔍 Raw query returned ${orderSnapshot.docs.length} documents");
 
       List<Order> filteredOrders = [];
 
@@ -655,6 +778,92 @@ class _HomePage extends State<HomePage> {
           for (var item in items) {
             if (item is Map<String, dynamic> && item['sellerId'] == user) {
               try {
+                // Extract variant details if available
+                String variantName = '';
+                Map<String, String> variantAttributes = {};
+
+                debugPrint(
+                  "🔍 Order item keys: ${item.keys.toList()}, Item data: $item",
+                );
+
+                // Try different possible variant field names
+                final variantData =
+                    item['variant'] ??
+                    item['variantName'] ??
+                    item['selectedVariant'] ??
+                    item['selectedVariantName'];
+
+                if (variantData != null) {
+                  if (variantData is Map<String, dynamic>) {
+                    final variant = variantData;
+                    variantName =
+                        variant['name']?.toString() ??
+                        variant['variantName']?.toString() ??
+                        '';
+                    if (variant['attributes'] is Map<String, dynamic>) {
+                      final attrs =
+                          variant['attributes'] as Map<String, dynamic>;
+                      attrs.forEach((key, value) {
+                        variantAttributes[key] = value?.toString() ?? '';
+                      });
+                    }
+                  } else if (variantData is String) {
+                    variantName = variantData.toString();
+                  }
+                } else {
+                  // First, try to find the variant name from direct fields
+                  final variantNameCandidates = [
+                    'variantName',
+                    'variant_name',
+                    'selectedVariant',
+                    'selected_variant',
+                    'selectedVariantName',
+                    'selected_variant_name',
+                    'variantTitle',
+                    'variant_title',
+                  ];
+
+                  for (final fieldName in variantNameCandidates) {
+                    if (item.containsKey(fieldName) &&
+                        item[fieldName] != null) {
+                      variantName = item[fieldName].toString();
+                      debugPrint(
+                        "🔍 Found variant name from field '$fieldName': $variantName",
+                      );
+                      break;
+                    }
+                  }
+
+                  // Then, extract variant attributes from other fields
+                  item.forEach((key, value) {
+                    final lowerKey = key.toString().toLowerCase();
+
+                    // Skip variant name fields - they should only be used for variantName
+                    if (lowerKey == 'variantname' ||
+                        lowerKey == 'variant_name' ||
+                        lowerKey == 'selectedvariant' ||
+                        lowerKey == 'selected_variant' ||
+                        lowerKey == 'selectedvariantname' ||
+                        lowerKey == 'selected_variant_name' ||
+                        lowerKey == 'varianttitle' ||
+                        lowerKey == 'variant_title') {
+                      return; // Skip adding to attributes
+                    }
+
+                    // Now check for actual variant attributes
+                    if (lowerKey.contains('color') ||
+                        lowerKey.contains('size') ||
+                        lowerKey.contains('storage') ||
+                        lowerKey.contains('attribute')) {
+                      if (!lowerKey.startsWith('variant_id') &&
+                          !lowerKey.startsWith('variantid')) {
+                        variantAttributes[key] = value?.toString() ?? '';
+                        debugPrint("🔍 Found variant attribute: $key = $value");
+                      }
+                    }
+                  });
+                }
+
                 // Create order object for each item that belongs to current seller
                 final orderData = {
                   'orderId': (data['orderId'] ?? doc.id).toString(),
@@ -692,13 +901,15 @@ class _HomePage extends State<HomePage> {
                   'shippingAddress':
                       (data['shippingAddress'] ?? data['address'] ?? '')
                           .toString(),
+                  'variantName': variantName,
+                  'variantAttributes': variantAttributes,
                 };
 
                 filteredOrders.add(Order.fromFirestore(orderData));
-                print("🔍 Found order item for seller: ${item['productName']}");
+                debugPrint("🔍 Found order item for seller: ${item['productName']}");
               } catch (e) {
-                print("❌ Error parsing order item: $e");
-                print("❌ Problematic item data: $item");
+                debugPrint("❌ Error parsing order item: $e");
+                debugPrint("❌ Problematic item data: $item");
               }
             }
           }
@@ -712,37 +923,37 @@ class _HomePage extends State<HomePage> {
         orders = filteredOrders;
       });
 
-      print(
+      debugPrint(
         "✅ Loaded ${orders.length} orders from Firestore for current seller",
       );
 
-      // Debug: Print first few orders
+      // Debug: debugPrint first few orders
       for (int i = 0; i < orders.length && i < 3; i++) {
         final order = orders[i];
-        print(
+        debugPrint(
           "🔍 Order $i: ${order.orderId} - ${order.productName} - ${order.status}",
         );
       }
     } catch (e) {
-      print("❌ Failed to load orders from Firestore: $e");
+      debugPrint("❌ Failed to load orders from Firestore: $e");
 
       // Test basic collection access
       try {
-        print("🔍 Testing basic collection access...");
+        debugPrint("🔍 Testing basic collection access...");
         final testSnapshot = await FirebaseFirestore.instance
             .collection('user_orders')
             .limit(1)
             .get();
-        print(
+        debugPrint(
           "🔍 Basic collection test returned ${testSnapshot.docs.length} docs",
         );
         if (testSnapshot.docs.isNotEmpty) {
-          print(
+          debugPrint(
             "🔍 Sample document structure: ${testSnapshot.docs.first.data()}",
           );
         }
       } catch (testError) {
-        print("❌ Basic collection test failed: $testError");
+        debugPrint("❌ Basic collection test failed: $testError");
       }
     }
   }
@@ -778,7 +989,7 @@ class _HomePage extends State<HomePage> {
                     try {
                       await pickAndStoreExcel();
                     } catch (e) {
-                      print("❌ Upload failed: $e");
+                      debugPrint("❌ Upload failed: $e");
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Upload failed: $e')),
                       );
@@ -835,7 +1046,7 @@ class _HomePage extends State<HomePage> {
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
+                  errorBuilder: (_, _, _) => Container(
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
@@ -938,7 +1149,7 @@ class _HomePage extends State<HomePage> {
                 width: 40,
                 height: 40,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
@@ -953,86 +1164,19 @@ class _HomePage extends State<HomePage> {
           ],
 
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  variant.name.isNotEmpty ? variant.name : 'Unnamed Variant',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                if (variant.attributes.isNotEmpty) ...[
-                  SizedBox(height: 4),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: variant.attributes.entries
-                        .where((attr) => attr.value.isNotEmpty)
-                        .map(
-                          (attr) => Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue[200]!),
-                            ),
-                            child: Text(
-                              '${attr.key}: ${attr.value}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.blue[800],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-                SizedBox(height: 4),
-                Row(
-                  children: [
-                    Icon(Icons.inventory_2, size: 14, color: Colors.grey[600]),
-                    SizedBox(width: 4),
-                    Text(
-                      'Stock: ${variant.stockQuantity}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: variant.stockQuantity > 0
-                            ? Colors.green[600]
-                            : Colors.red[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: Text(
+              variant.name.isNotEmpty ? variant.name : 'Unnamed Variant',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
           ),
 
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '₹${variant.price.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
-                ),
-              ),
-              if (variant.stockQuantity == 0)
-                Text(
-                  'Out of Stock',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.red[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-            ],
+          Text(
+            '₹${variant.price.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.green[700],
+            ),
           ),
         ],
       ),
@@ -1040,525 +1184,11 @@ class _HomePage extends State<HomePage> {
   }
 
   Widget _buildStockTab() {
-    // Get all variants from all products for individual display
-    List<Map<String, dynamic>> allVariants = [];
-
-    for (final product in products) {
-      if (product.variants.isNotEmpty) {
-        // Add each variant with product context
-        for (final variant in product.variants) {
-          allVariants.add({'product': product, 'variant': variant});
-        }
-      } else {
-        // For products without variants, treat the product itself as a variant
-        allVariants.add({
-          'product': product,
-          'variant': null, // No variant, use product data
-        });
-      }
-    }
-
-    return allVariants.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.inventory_2_outlined, size: 100, color: Colors.grey),
-                SizedBox(height: 20),
-                Text(
-                  'No Stock Available',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Add products to see stock information.',
-                  style: TextStyle(fontSize: 16),
-                ),
-              ],
-            ),
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Stock Inventory',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Individual Variants (${allVariants.length} items)',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              ),
-              SizedBox(height: 14),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: allVariants.length,
-                  itemBuilder: (context, index) {
-                    final item = allVariants[index];
-                    final product = item['product'] as Product;
-                    final variant = item['variant'] as ProductVariant?;
-
-                    return _buildStockVariantCard(product, variant);
-                  },
-                ),
-              ),
-            ],
-          );
-  }
-
-  Widget _buildStockVariantCard(Product product, ProductVariant? variant) {
-    // Determine stock quantity and other details
-    final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
-    final variantName = variant?.name ?? 'Base Product';
-    final price = variant?.price ?? product.basePrice;
-    final image =
-        variant?.image ??
-        (product.images.isNotEmpty ? product.images.first : null);
-
-    // Determine stock status color
-    Color stockColor;
-    if (stockQuantity > 10) {
-      stockColor = Colors.green;
-    } else if (stockQuantity > 0) {
-      stockColor = Colors.orange;
-    } else {
-      stockColor = Colors.red;
-    }
-
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Row(
-          children: [
-            // Product/Variant Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: image != null && image.isNotEmpty
-                  ? Image.network(
-                      image,
-                      width: 50,
-                      height: 50,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.image, color: Colors.grey[600]),
-                      ),
-                    )
-                  : Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.inventory_2, color: Colors.grey[600]),
-                    ),
-            ),
-            SizedBox(width: 12),
-
-            // Product and Variant Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (variant != null) ...[
-                    SizedBox(height: 2),
-                    Text(
-                      variantName,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        '${product.brand}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        '₹${price.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green[700],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // Variant attributes (if any)
-                  if (variant != null && variant.attributes.isNotEmpty) ...[
-                    SizedBox(height: 4),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 2,
-                      children: variant.attributes.entries
-                          .take(2) // Show only first 2 attributes to save space
-                          .map(
-                            (attr) => Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.blue[200]!),
-                              ),
-                              child: Text(
-                                '${attr.key}: ${attr.value}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.blue[800],
-                                ),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-
-            // Stock Status
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: stockColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: stockColor),
-                  ),
-                  child: Text(
-                    '$stockQuantity',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: stockColor,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  stockQuantity == 0
-                      ? 'Out of Stock'
-                      : stockQuantity == 1
-                      ? '1 left'
-                      : 'in stock',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: stockColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return StockTab(products: products);
   }
 
   Widget _buildOrdersTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Orders Placed',
-              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-            ),
-            IconButton(
-              icon: Icon(Icons.refresh),
-              onPressed: () {
-                print("🔄 Manual refresh triggered");
-                loadOrders();
-              },
-            ),
-          ],
-        ),
-        SizedBox(height: 10),
-
-        // Debug info
-        Container(
-          padding: EdgeInsets.all(12),
-          margin: EdgeInsets.only(bottom: 16),
-          decoration: BoxDecoration(
-            color: orders.isEmpty
-                ? Colors.yellow.withOpacity(0.1)
-                : Colors.green.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: orders.isEmpty ? Colors.yellow : Colors.green,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                "Debug Info:",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "Current User: ${FirebaseAuth.instance.currentUser?.uid ?? 'Not logged in'}",
-              ),
-              Text("Orders loaded: ${orders.length}"),
-              Text("Collection: user_orders"),
-              Text("Filter: items array with sellerId"),
-            ],
-          ),
-        ),
-
-        if (orders.isEmpty)
-          Expanded(
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.shopping_bag_outlined,
-                    size: 100,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 20),
-                  Text(
-                    'No Orders Yet',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Orders will appear here once customers purchase your products.',
-                    style: TextStyle(fontSize: 16),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      print("🔄 Manual refresh from button");
-                      loadOrders();
-                    },
-                    child: Text("Refresh Orders"),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else
-          _buildOrdersList(),
-      ],
-    );
-  }
-
-  Widget _buildOrdersList() {
-    if (orders.isEmpty) return SizedBox.shrink();
-
-    // Group orders by date
-    Map<String, List<Order>> ordersByDate = {};
-    for (Order order in orders) {
-      String dateKey = DateFormat('yyyy-MM-dd').format(order.orderDate);
-      ordersByDate[dateKey] ??= [];
-      ordersByDate[dateKey]!.add(order);
-    }
-
-    // Sort dates in descending order
-    List<String> sortedDates = ordersByDate.keys.toList();
-    sortedDates.sort((a, b) => b.compareTo(a));
-
-    return Expanded(
-      child: ListView.builder(
-        itemCount: sortedDates.length,
-        itemBuilder: (context, index) {
-          String dateKey = sortedDates[index];
-          List<Order> dayOrders = ordersByDate[dateKey]!;
-          DateTime date = DateTime.parse(dateKey);
-          String formattedDate = DateFormat('EEEE, MMMM dd, yyyy').format(date);
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(12),
-                margin: EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  formattedDate,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[800],
-                  ),
-                ),
-              ),
-              ...dayOrders.map((order) => _buildOrderCard(order)).toList(),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildOrderCard(Order order) {
-    Color statusColor;
-    switch (order.status.toLowerCase()) {
-      case 'pending':
-        statusColor = Colors.orange;
-        break;
-      case 'confirmed':
-        statusColor = Colors.blue;
-        break;
-      case 'shipped':
-        statusColor = Colors.purple;
-        break;
-      case 'delivered':
-        statusColor = Colors.green;
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
-
-    return Card(
-      margin: EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      child: Padding(
-        padding: EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(
-                    order.productImage,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.image, color: Colors.grey),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        order.productName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Order ID: ${order.orderId}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            'Qty: ${order.quantity}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          Text(
-                            '\$${order.totalAmount.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor, width: 1),
-                  ),
-                  child: Text(
-                    order.status.toUpperCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Divider(height: 1),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.person, size: 16, color: Colors.grey[600]),
-                SizedBox(width: 4),
-                Text(
-                  order.buyerName,
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(width: 16),
-                Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
-                SizedBox(width: 4),
-                Text(
-                  DateFormat('hh:mm a').format(order.orderDate),
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+    return OrdersTab(orders: orders, onRefresh: loadOrders);
   }
 
   @override

@@ -17,6 +17,8 @@ class Order {
   final String buyerEmail;
   final String buyerPhone;
   final String shippingAddress;
+  final String variantName;
+  final Map<String, String> variantAttributes;
 
   Order({
     required this.orderId,
@@ -34,9 +36,19 @@ class Order {
     required this.buyerEmail,
     required this.buyerPhone,
     required this.shippingAddress,
+    this.variantName = '',
+    this.variantAttributes = const {},
   });
 
   factory Order.fromFirestore(Map<String, dynamic> data) {
+    // Extract variant attributes safely
+    Map<String, String> variantAttrs = {};
+    if (data['variantAttributes'] is Map) {
+      (data['variantAttributes'] as Map).forEach((key, value) {
+        variantAttrs[key.toString()] = value?.toString() ?? '';
+      });
+    }
+
     return Order(
       orderId: data['orderId'] ?? '',
       sellerId: data['sellerId'] ?? '',
@@ -57,6 +69,8 @@ class Order {
       buyerEmail: data['buyerEmail'] ?? '',
       buyerPhone: data['buyerPhone'] ?? '',
       shippingAddress: data['shippingAddress'] ?? '',
+      variantName: data['variantName'] ?? '',
+      variantAttributes: variantAttrs,
     );
   }
 
@@ -77,6 +91,8 @@ class Order {
       'buyerEmail': buyerEmail,
       'buyerPhone': buyerPhone,
       'shippingAddress': shippingAddress,
+      'variantName': variantName,
+      'variantAttributes': variantAttributes,
     };
   }
 }

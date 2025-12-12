@@ -30,10 +30,8 @@ class _SignUpPage extends State<SignUpPage> {
       mobile: mobileController.text,
     );
     if (result == null) {
-      debugPrint("Signup success!");
       Navigator.pushNamed(context, '/home');
     } else {
-      debugPrint("Signup error: $result");
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(result)));
