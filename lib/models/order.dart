@@ -13,6 +13,7 @@ class Order {
   final String
   status; // 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'
   final DateTime orderDate;
+  final DateTime? lastUpdated;
   final String buyerName;
   final String buyerEmail;
   final String buyerPhone;
@@ -32,6 +33,7 @@ class Order {
     required this.totalAmount,
     required this.status,
     required this.orderDate,
+    this.lastUpdated,
     required this.buyerName,
     required this.buyerEmail,
     required this.buyerPhone,
@@ -65,6 +67,9 @@ class Order {
       orderDate: data['orderDate'] != null
           ? (data['orderDate'] as Timestamp).toDate()
           : DateTime.now(),
+      lastUpdated: data['lastUpdated'] != null
+          ? (data['lastUpdated'] as Timestamp).toDate()
+          : null,
       buyerName: data['buyerName'] ?? '',
       buyerEmail: data['buyerEmail'] ?? '',
       buyerPhone: data['buyerPhone'] ?? '',
@@ -87,6 +92,9 @@ class Order {
       'totalAmount': totalAmount,
       'status': status,
       'orderDate': Timestamp.fromDate(orderDate),
+      'lastUpdated': lastUpdated != null
+          ? Timestamp.fromDate(lastUpdated!)
+          : null,
       'buyerName': buyerName,
       'buyerEmail': buyerEmail,
       'buyerPhone': buyerPhone,
