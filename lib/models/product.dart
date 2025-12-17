@@ -3,14 +3,12 @@ class Product {
   final double basePrice; // Base price (can be overridden by variants)
   final String category;
   final List<String> keywords;
-  final List<String> images;
   final int stockQuantity;
   final List<ProductVariant> variants; // List of product variants
 
   Product({
     required this.name,
     required this.brand,
-    required this.images,
     required this.description,
     required this.category,
     required this.basePrice,
@@ -55,7 +53,7 @@ class ProductVariant {
   final int stockQuantity;
   final Map<String, String>
   attributes; // e.g., {"color": "Red", "storage": "128GB"}
-  final String? image; // Optional variant-specific image
+  final List<String> images; // Variant-specific images
 
   ProductVariant({
     required this.variantId,
@@ -63,7 +61,7 @@ class ProductVariant {
     required this.price,
     required this.stockQuantity,
     this.attributes = const {},
-    this.image,
+    this.images = const [],
   });
 
   factory ProductVariant.fromMap(Map<String, dynamic> map) {
@@ -88,7 +86,9 @@ class ProductVariant {
       attributes: map['attributes'] is Map<String, String>
           ? Map<String, String>.from(map['attributes'])
           : _parseAttributes(map),
-      image: map['image']?.toString() ?? map['Image']?.toString(),
+      images: _parseImages(
+        map['images'] ?? map['Images'] ?? map['image'] ?? map['Image'],
+      ),
     );
   }
 
@@ -113,15 +113,14 @@ class ProductVariant {
     // Common attribute mappings
     if (map['Color'] != null) attributes['Color'] = map['Color'].toString();
     if (map['Size'] != null) attributes['Size'] = map['Size'].toString();
-    if (map['Storage'] != null){
+    if (map['Storage'] != null) {
       attributes['Storage'] = map['Storage'].toString();
     }
     if (map['Memory'] != null) attributes['Memory'] = map['Memory'].toString();
     if (map['RAM'] != null) attributes['RAM'] = map['RAM'].toString();
-    if (map['Screen_Size'] != null){
+    if (map['Screen_Size'] != null) {
       attributes['Screen Size'] = map['Screen_Size'].toString();
     }
-     
 
     // Add any other custom attributes
     for (final entry in map.entries) {
@@ -146,5 +145,28 @@ class ProductVariant {
     }
 
     return attributes;
+  }
+
+  static List<String> _parseImages(dynamic value) {
+    if (value == null) return [];
+
+    if (value is List) {
+      return value
+          .map((item) => item?.toString() ?? '')
+          .where((img) => img.isNotEmpty)
+          .toList();
+    }
+
+    if (value is String && value.isNotEmpty) {
+      // Handle space-separated images or single image
+      final images = value
+          .split(' ')
+          .map((img) => img.trim())
+          .where((img) => img.isNotEmpty)
+          .toList();
+      return images;
+    }
+
+    return [];
   }
 }

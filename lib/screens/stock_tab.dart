@@ -78,9 +78,9 @@ class StockTab extends StatelessWidget {
     // Determine stock quantity and other details
     final stockQuantity = variant?.stockQuantity ?? product.stockQuantity;
     final variantName = variant?.name ?? 'Base Product';
-    final image =
-        variant?.image ??
-        (product.images.isNotEmpty ? product.images.first : null);
+    final image = variant?.images.isNotEmpty == true
+        ? variant!.images.first
+        : null;
 
     // Determine stock status color
     Color stockColor;

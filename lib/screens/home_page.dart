@@ -116,7 +116,6 @@ class _HomePage extends State<HomePage> {
             description: data['description']?.toString() ?? 'No description',
             deliveryTime: data['deliveryTime']?.toString() ?? 'N/A',
             stockQuantity: data['stockQuantity'] ?? 0,
-            images: List<String>.from(data['images'] ?? []),
             keywords: List<String>.from(data['keywords'] ?? []),
             variants: variants,
           );
@@ -585,9 +584,8 @@ class _HomePage extends State<HomePage> {
 
         // Calculate total stock from variants if available, otherwise use product stock
         int totalStock = 0;
-        List<String> allImages = [];
 
-        // Process variants first to get images and calculate total stock
+        // Process variants to calculate total stock
         final variantsList = <Map<String, dynamic>>[];
         if (productMap['variants'] != null &&
             (productMap['variants'] as List).isNotEmpty) {
@@ -599,10 +597,18 @@ class _HomePage extends State<HomePage> {
             );
             totalStock += variantStock;
 
-            // Collect variant images
-            final variantImage = _cleanString(variant['Image']);
-            if (variantImage != null && variantImage.isNotEmpty) {
-              allImages.add(variantImage);
+            // Process variant images as array
+            final variantImageField =
+                _cleanString(variant['Images']) ??
+                _cleanString(variant['Image']);
+            final variantImages = <String>[];
+            if (variantImageField != null && variantImageField.isNotEmpty) {
+              variantImages.addAll(
+                variantImageField
+                    .split(' ')
+                    .map((img) => img.trim())
+                    .where((img) => img.isNotEmpty),
+              );
             }
 
             // Calculate variant price using base price + modifier
@@ -669,30 +675,13 @@ class _HomePage extends State<HomePage> {
               'priceModifier': priceModifier,
               'stockQuantity': variantStock,
               'attributes': attrs,
-              'image': variantImage,
+              'images': variantImages,
             });
           }
         } else {
           // No variants, use product-level stock
           totalStock = _parseInt(productMap['Stock Quantity']);
         }
-
-        // Handle product images - prefer variant images if available
-        final productImageField = _cleanString(productMap['Images']);
-        if (productImageField != null && productImageField.isNotEmpty) {
-          final productImages = productImageField
-              .split(',')
-              .map((e) => e.trim())
-              .where((e) => e.isNotEmpty)
-              .toList();
-          allImages.insertAll(0, productImages); // Product images first
-        }
-
-        // Remove duplicates and empty images
-        final images = allImages
-            .toSet()
-            .where((img) => img.isNotEmpty)
-            .toList();
 
         final keywordsList = _cleanString(productMap['Keywords']) ?? '';
         final keywords = keywordsList
@@ -720,7 +709,6 @@ class _HomePage extends State<HomePage> {
                   brand.toLowerCase(),
                   category.toLowerCase(),
                 ].where((k) => k.isNotEmpty).toList(),
-          'images': images, // Combined images from variants and product
           'variants': variantsList,
           'hasVariants': variantsList.isNotEmpty,
         };
@@ -756,14 +744,18 @@ class _HomePage extends State<HomePage> {
       }
 
       debugPrint("🔍 Current user ID: $user");
-      debugPrint("🔍 Attempting to load orders from 'user_orders' collection...");
+      debugPrint(
+        "🔍 Attempting to load orders from 'user_orders' collection...",
+      );
 
       // Get all orders and filter by sellerId in items array
       final QuerySnapshot orderSnapshot = await FirebaseFirestore.instance
           .collection('user_orders')
           .get(); // Get all orders first, then filter
 
-      debugPrint("🔍 Raw query returned ${orderSnapshot.docs.length} documents");
+      debugPrint(
+        "🔍 Raw query returned ${orderSnapshot.docs.length} documents",
+      );
 
       List<Order> filteredOrders = [];
 
@@ -906,7 +898,9 @@ class _HomePage extends State<HomePage> {
                 };
 
                 filteredOrders.add(Order.fromFirestore(orderData));
-                debugPrint("🔍 Found order item for seller: ${item['productName']}");
+                debugPrint(
+                  "🔍 Found order item for seller: ${item['productName']}",
+                );
               } catch (e) {
                 debugPrint("❌ Error parsing order item: $e");
                 debugPrint("❌ Problematic item data: $item");
@@ -1021,15 +1015,13 @@ class _HomePage extends State<HomePage> {
   }
 
   Widget _buildProductCard(Product product) {
-    // Get the best image to display (prefer variant images if main product has none)
+    // Get the best image to display (use first variant image if available)
     String? displayImage;
-    if (product.images.isNotEmpty) {
-      displayImage = product.images.first;
-    } else if (product.variants.isNotEmpty) {
+    if (product.variants.isNotEmpty) {
       // Try to get image from first variant that has one
       for (final variant in product.variants) {
-        if (variant.image != null && variant.image!.isNotEmpty) {
-          displayImage = variant.image;
+        if (variant.images.isNotEmpty) {
+          displayImage = variant.images.first;
           break;
         }
       }
@@ -1141,11 +1133,11 @@ class _HomePage extends State<HomePage> {
       child: Row(
         children: [
           // Variant image (if available)
-          if (variant.image != null && variant.image!.isNotEmpty) ...[
+          if (variant.images.isNotEmpty) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: Image.network(
-                variant.image!,
+                variant.images.first,
                 width: 40,
                 height: 40,
                 fit: BoxFit.cover,
