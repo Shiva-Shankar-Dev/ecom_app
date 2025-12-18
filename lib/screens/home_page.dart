@@ -987,59 +987,80 @@ class _HomePage extends State<HomePage> {
   }
 
   Widget _buildProductsTab() {
-    return products.isEmpty
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                Lottie.asset('assets/post.json', width: 200, height: 200),
-                SizedBox(height: 20),
-                Text(
-                  'No Products Found',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 10),
-                Text(
-                  'Please add products to get started.',
-                  style: TextStyle(fontSize: 16),
-                ),
-                SizedBox(height: 20),
-                AuthButton(
-                  hintText: 'Add Products',
-                  onPressed: () async {
-                    try {
-                      await pickAndStoreExcel();
-                    } catch (e) {
-                      debugPrint("❌ Upload failed: $e");
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Upload failed: $e')),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-          )
-        : Column(
+    return products.isEmpty ? Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Lottie.asset('assets/post.json', width: 200, height: 200),
+          SizedBox(height: 20),
+          Text(
+            'No Products Found',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Please add products to get started.',
+            style: TextStyle(fontSize: 16),
+          ),
+          SizedBox(height: 20),
+          AuthButton(
+            hintText: 'Add Products',
+            onPressed: () async {
+              try {
+                await pickAndStoreExcel();
+              } catch (e) {
+                debugPrint("❌ Upload failed: $e");
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Upload failed: $e')),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    ) : CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          automaticallyImplyLeading: false,
+          titleSpacing: 7,
+          pinned: false,
+          floating: true,
+          title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              FutureBuilder<String?>(
+                future: _authService.getCurrentUsername(),
+                builder: (context, snapshot) {
+                  final username = snapshot.data ?? 'Loading...';
+                  return Text(
+                    "Welcome, $username",
+                    style: TextStyle(fontSize: 14),
+                  );
+                },
+              ),
               Text(
                 'Your Products',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 10),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: products.length,
-                  itemBuilder: (context, index) {
-                    final product = products[index];
-                    return _buildProductCard(product);
-                  },
+                style: TextStyle(
+                  fontSize: 25,
+                  fontFamily: "Poppins",
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
-          );
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+              final product = products[index];
+              return _buildProductCard(product);
+            },
+            childCount: products.length,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildProductCard(Product product) {
@@ -1056,36 +1077,35 @@ class _HomePage extends State<HomePage> {
     }
 
     return Card(
-      margin: EdgeInsets.symmetric(vertical: 10),
+      margin: EdgeInsets.symmetric(horizontal: 5.0, vertical: 10),
       child: ExpansionTile(
-        leading: displayImage != null && displayImage.isNotEmpty
-            ? ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  displayImage,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.image, color: Colors.grey[600]),
-                  ),
-                ),
-              )
-            : Container(
+        leading: displayImage != null &&
+          displayImage.isNotEmpty ? ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              displayImage,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => Container(
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.shopping_bag, color: Colors.grey[600]),
+                child: Icon(Icons.image, color: Colors.grey[600]),
               ),
+            ),
+          ) : Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(Icons.shopping_bag, color: Colors.grey[600]),
+        ),
         title: Text(
           product.name,
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -1297,8 +1317,6 @@ class _HomePage extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Home Page"),
-        automaticallyImplyLeading: true,
         actions: [
           IconButton(
             icon: Icon(Icons.add),
@@ -1323,32 +1341,61 @@ class _HomePage extends State<HomePage> {
         ],
       ),
       drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            ListTile(
-              leading: Icon(Icons.home),
-              title: Text('Home'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.exit_to_app_rounded),
-              title: Text('Sign Out'),
-              onTap: () {
-                _authService.signOut();
-                Navigator.pushNamed(context, '/login');
-              },
-            ),
-          ],
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              FutureBuilder<String?>(
+                future: _authService.getCurrentUsername(),
+                builder: (context, snapshot) {
+                  final username = snapshot.data ?? 'Loading...';
+                  return UserAccountsDrawerHeader(
+                    accountName: Text(username, style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: "Poppins"
+                    ),),
+                    accountEmail: Text(
+                      FirebaseAuth.instance.currentUser?.email ?? 'No email',
+                    ),
+                    currentAccountPicture: CircleAvatar(
+                      backgroundColor: Colors.blue,
+                      child: Text(
+                        username.isNotEmpty ? username[0].toUpperCase() : 'U',
+                        style: TextStyle(
+                          fontSize: 40.0,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.home),
+                title: Text('Home'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.settings),
+                title: Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.exit_to_app_rounded),
+                title: Text('Sign Out'),
+                onTap: () {
+                  _authService.signOut();
+                  Navigator.pushNamed(context, '/login');
+                },
+              ),
+            ],
+          ),
         ),
       ),
 

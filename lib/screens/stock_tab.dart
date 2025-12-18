@@ -45,29 +45,48 @@ class StockTab extends StatelessWidget {
               ],
             ),
           )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Stock Inventory',
-                style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+        : CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                surfaceTintColor: Colors.transparent,
+                titleSpacing: 7,
+                automaticallyImplyLeading: false,
+                pinned: false,
+                floating: true,
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Stock Inventory',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      'Individual Variants (${allVariants.length} items)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              SizedBox(height: 10),
-              Text(
-                'Individual Variants (${allVariants.length} items)',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              SliverToBoxAdapter(
+                child: SizedBox(height: 10,),
               ),
-              SizedBox(height: 14),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: allVariants.length,
-                  itemBuilder: (context, index) {
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
                     final item = allVariants[index];
                     final product = item['product'] as Product;
                     final variant = item['variant'] as ProductVariant?;
 
                     return _buildStockVariantCard(product, variant);
                   },
+                  childCount: allVariants.length,
                 ),
               ),
             ],

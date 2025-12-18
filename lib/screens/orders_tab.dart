@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:intl/intl.dart';
 import 'package:ecom_app/models/order.dart';
@@ -125,33 +124,48 @@ class _OrdersTabState extends State<OrdersTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Orders',
-              style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-            ),
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey[100],
+    if (widget.orders.isEmpty) {
+      return CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: false,
+            floating: true,
+            expandedHeight: 120,
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding: EdgeInsets.all(8.0),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Orders',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey[100],
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.refresh),
+                          onPressed: () {
+                            widget.onRefresh();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              child: IconButton(
-                icon: Icon(Icons.refresh),
-                onPressed: () {
-                  widget.onRefresh();
-                },
-              ),
             ),
-          ],
-        ),
-        SizedBox(height: 16),
-        if (widget.orders.isEmpty)
-          Expanded(
+          ),
+          SliverFillRemaining(
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -192,14 +206,15 @@ class _OrdersTabState extends State<OrdersTab> {
                 ],
               ),
             ),
-          )
-        else
-          _buildOrdersList(),
-      ],
-    );
+          ),
+        ],
+      );
+    }
+
+    return _buildModernOrdersList();
   }
 
-  Widget _buildOrdersList() {
+  Widget _buildModernOrdersList() {
     if (widget.orders.isEmpty) return SizedBox.shrink();
 
     Map<String, List<Order>> ordersByDate = {};
@@ -212,35 +227,105 @@ class _OrdersTabState extends State<OrdersTab> {
     List<String> sortedDates = ordersByDate.keys.toList();
     sortedDates.sort((a, b) => b.compareTo(a));
 
-    return Expanded(
-      child: ListView.builder(
-        padding: EdgeInsets.only(bottom: 16),
-        itemCount: sortedDates.length,
-        itemBuilder: (context, index) {
-          String dateKey = sortedDates[index];
-          List<Order> dayOrders = ordersByDate[dateKey]!;
-          DateTime date = DateTime.parse(dateKey);
-          String formattedDate = DateFormat('EEEE, MMM dd, yyyy').format(date);
+    // Create flat list of widgets: date headers + order cards
+    List<Widget> sliverItems = [];
+    for (String dateKey in sortedDates) {
+      List<Order> dayOrders = ordersByDate[dateKey]!;
+      DateTime date = DateTime.parse(dateKey);
+      String formattedDate = DateFormat('EEEE, MMM dd, yyyy').format(date);
 
-          return Column(
+      sliverItems.add(
+        _buildDateHeader(formattedDate),
+      );
+
+      for (Order order in dayOrders) {
+        sliverItems.add(_buildOrderCard(order));
+      }
+    }
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          pinned: false,
+          floating: true,
+          toolbarHeight: 65,
+          titleSpacing: 7,
+          automaticallyImplyLeading: false,
+          surfaceTintColor: Colors.transparent,
+          title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                child: Text(
-                  formattedDate,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                    letterSpacing: 0.3,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Orders',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[900],
+                    ),
                   ),
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey[100],
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.refresh, color: Colors.grey[700]),
+                      onPressed: () {
+                        widget.onRefresh();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${widget.orders.length} order${widget.orders.length != 1 ? 's' : ''}',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-              ...dayOrders.map((order) => _buildOrderCard(order)),
             ],
-          );
-        },
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => sliverItems[index],
+            childCount: sliverItems.length,
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.only(bottom: 20),
+          sliver: SliverToBoxAdapter(
+            child: SizedBox.shrink(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDateHeader(String formattedDate) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(5, 20, 16, 12),
+      child: Row(
+        spacing: 20,
+        children: [
+          Expanded(child: Divider()),
+          Text(
+            formattedDate,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey[700],
+              letterSpacing: 0.3,
+            ),
+          ),
+          Expanded(child: Divider()),
+        ],
       ),
     );
   }
@@ -249,24 +334,29 @@ class _OrdersTabState extends State<OrdersTab> {
     final displayStatus = _selectedStatusFor(order);
     final statusColor = _colorForStatus(displayStatus);
     final isUpdating = _isUpdating[order.orderId] == true;
+    final isDelivered = displayStatus.toLowerCase() == 'delivered';
 
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(8),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Colors.black.withAlpha(3),
+            blurRadius: 4,
+            offset: Offset(0, 1),
           ),
         ],
       ),
       child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 15.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -274,22 +364,28 @@ class _OrdersTabState extends State<OrdersTab> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product Image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      order.productImage,
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200],
-                          borderRadius: BorderRadius.circular(10),
+                  // Product Image with Border
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!, width: 1),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: Image.network(
+                        order.productImage,
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(11),
+                          ),
+                          child: Icon(Icons.image, size: 40, color: Colors.grey),
                         ),
-                        child: Icon(Icons.image, size: 40, color: Colors.grey),
                       ),
                     ),
                   ),
@@ -302,36 +398,30 @@ class _OrdersTabState extends State<OrdersTab> {
                         Text(
                           order.productName,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.grey[900],
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'ID: ${order.orderId.substring(0, order.orderId.length > 8 ? 8 : order.orderId.length)}...',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                          ],
+                        SizedBox(height: 2),
+                        Text(
+                          'ID: ${order.orderId}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontFamily: 'monospace',
+                          ),
                         ),
-                        SizedBox(height: 8),
+                        SizedBox(height: 15,),
                         Container(
                           padding: EdgeInsets.symmetric(
-                            horizontal: 12,
+                            horizontal: 10,
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: statusColor.withAlpha(25),
+                            color: statusColor.withAlpha(20),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(color: statusColor, width: 1.5),
                           ),
@@ -345,6 +435,7 @@ class _OrdersTabState extends State<OrdersTab> {
                             ),
                           ),
                         ),
+                        SizedBox(height: 10),
                       ],
                     ),
                   ),
@@ -352,86 +443,125 @@ class _OrdersTabState extends State<OrdersTab> {
               ),
               SizedBox(height: 16),
               // Quick Info Row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildQuickInfo('Qty', '${order.quantity}'),
-                  _buildQuickInfo(
-                    'Amount',
-                    '\$${order.totalAmount.toStringAsFixed(2)}',
-                  ),
-                  _buildQuickInfo(
-                    'Date',
-                    DateFormat('MMM dd').format(order.orderDate),
-                  ),
-                ],
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 5),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildQuickInfo('Qty', '${order.quantity}'),
+                    Container(
+                      height: 30,
+                      width: 1,
+                      color: Colors.grey[300],
+                    ),
+                    _buildQuickInfo(
+                      'Amount',
+                      '\$${order.totalAmount.toStringAsFixed(2)}',
+                    ),
+                    Container(
+                      height: 30,
+                      width: 1,
+                      color: Colors.grey[300],
+                    ),
+                    _buildQuickInfo(
+                      'Date',
+                      DateFormat('MMM dd').format(order.orderDate),
+                    ),
+                  ],
+                ),
               ),
               SizedBox(height: 16),
-              Divider(height: 1, color: Colors.grey[200]),
-              SizedBox(height: 16),
               // Customer Info
-              Row(
-                children: [
-                  Icon(Icons.person_outline, size: 16, color: Colors.grey[600]),
-                  SizedBox(width: 8),
-                  Text(
-                    order.buyerName,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[800],
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10.0),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.person_outline, size: 14, color: Colors.blue[600]),
                     ),
-                  ),
-                ],
+                    SizedBox(width: 10),
+                    Text(
+                      order.buyerName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               // Variant Info if available
               if (order.variantName.trim().isNotEmpty) ...[
                 SizedBox(height: 12),
                 Container(
-                  padding: EdgeInsets.all(10),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.blue[200]!),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Variant: ${order.variantName}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.blue[900],
-                          fontWeight: FontWeight.w600,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(Icons.style, size: 12, color: Colors.blue[700]),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Variant: ${order.variantName}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blue[900],
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
                       if (order.variantAttributes.isNotEmpty) ...[
-                        SizedBox(height: 8),
+                        SizedBox(height: 10),
                         Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
+                          spacing: 8,
+                          runSpacing: 8,
                           children: order.variantAttributes.entries
                               .map(
                                 (attr) => Container(
                                   padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
+                                    horizontal: 10,
+                                    vertical: 5,
                                   ),
                                   decoration: BoxDecoration(
                                     color: Colors.blue[100],
-                                    borderRadius: BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     '${attr.key}: ${attr.value}',
                                     style: TextStyle(
-                                      fontSize: 10,
+                                      fontSize: 11,
                                       color: Colors.blue[900],
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
-                              )
-                              .toList(),
+                              ).toList(),
                         ),
                       ],
                     ],
@@ -439,119 +569,182 @@ class _OrdersTabState extends State<OrdersTab> {
                 ),
               ],
               // Status Update Section
-              SizedBox(height: 14),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Update Status',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            value: displayStatus,
-                            decoration: InputDecoration(
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(
-                                  color: Colors.grey[300]!,
-                                ),
-                              ),
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                            items: _statusOptions
-                                .map(
-                                  (status) => DropdownMenuItem(
-                                    value: status,
-                                    child: Text(_formatStatus(status)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: isUpdating
-                                ? null
-                                : (value) {
-                                    if (value == null) return;
-                                    setState(() {
-                                      _statusSelections[order.orderId] = value;
-                                    });
-                                  },
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        ElevatedButton(
-                          onPressed: isUpdating
-                              ? null
-                              : () => _updateOrderStatus(order),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: statusColor,
-                            foregroundColor: Colors.white,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: isUpdating
-                              ? SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
-                                  ),
-                                )
-                              : Text(
-                                  'Update',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              // Last Updated
-              if (order.lastUpdated != null) ...[
-                SizedBox(height: 10),
+              SizedBox(height: 16),
+              if (isDelivered)
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  margin: EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(6),
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green[300]!, width: 1.5),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.schedule, size: 13, color: Colors.grey[600]),
-                      SizedBox(width: 6),
+                      Container(
+                        padding: EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.green[200],
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_circle,
+                          color: Colors.green[700],
+                          size: 18,
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Order Delivered',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[900],
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Status updates are locked for delivered orders',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.green[700],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: statusColor.withAlpha(8),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: statusColor.withAlpha(80), width: 1.5),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Update Status',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              initialValue: displayStatus,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                              ),
+                              items: _statusOptions
+                                  .map(
+                                    (status) => DropdownMenuItem(
+                                      value: status,
+                                      child: Text(_formatStatus(status)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: isUpdating
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      setState(() {
+                                        _statusSelections[order.orderId] = value;
+                                      });
+                                    },
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: isUpdating
+                                ? null
+                                : () => _updateOrderStatus(order),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: statusColor,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: isUpdating
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    'Update',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              // Last Updated
+              if (order.lastUpdated != null) ...[
+                SizedBox(height: 12),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline, size: 14, color: Colors.green[600]),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Updated: ${DateFormat('MMM dd, hh:mm a').format(order.lastUpdated!)}',
                           style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500,
+                            fontSize: 11,
+                            color: Colors.green[700],
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),

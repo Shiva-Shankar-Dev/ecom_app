@@ -96,6 +96,9 @@ flutter:
       fonts:
         - asset: assets/DMSerifText-Regular.ttf
           weight: 400
+    - family: Poppins
+      fonts:
+        - asset: assets/Poppins-Bold.ttf
   #   - family: Trajan Pro
   #     fonts:
   #       - asset: fonts/TrajanPro.ttf

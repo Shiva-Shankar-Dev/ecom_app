@@ -1,11 +1,11 @@
 import 'package:ecom_app/animated_splash_screen_widget.dart';
-import 'package:ecom_app/screens/otp_page.dart';
+import 'package:ecom_app/screens/auth/otp_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'screens/login_page.dart';
-import 'screens/signup_page.dart';
+import 'screens/auth/login_page.dart';
+import 'screens/auth/signup_page.dart';
 import 'screens/home_page.dart';
-import 'screens/mobile_login_page.dart';
+import 'screens/auth/mobile_login_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

@@ -50,10 +50,35 @@ class AuthService {
   // Get current user ID
   String? getCurrentUID() => _auth.currentUser?.uid;
 
-  // Get user details
-  Future<DocumentSnapshot<Map<String, dynamic>>> getUserDetails() {
-    final uid = getCurrentUID();
-    if (uid == null) throw Exception('User not authenticated');
-    return _firestore.collection('users').doc(uid).get();
+  // Get current user's username/name from Firestore
+  Future<String?> getCurrentUsername() async {
+    try {
+      final uid = getCurrentUID();
+      if (uid == null) return null;
+
+      final doc = await _firestore.collection('sellers').doc(uid).get();
+      if (doc.exists) {
+        return doc.data()?['name'] as String?;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Get all current user details
+  Future<Map<String, dynamic>?> getCurrentUserDetails() async {
+    try {
+      final uid = getCurrentUID();
+      if (uid == null) return null;
+
+      final doc = await _firestore.collection('sellers').doc(uid).get();
+      if (doc.exists) {
+        return doc.data();
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 }

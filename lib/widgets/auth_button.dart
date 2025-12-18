@@ -10,6 +10,9 @@ class AuthButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+      width: MediaQuery.of(context).size.width - 10,
+      height: 50,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [ColorPallete.color1, ColorPallete.color2],

@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-import '../colorPallete/color_pallete.dart';
+import '../../colorPallete/color_pallete.dart';
 
 class OtpPage extends StatefulWidget {
   final String phone;
