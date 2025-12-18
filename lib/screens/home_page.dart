@@ -118,6 +118,13 @@ class _HomePage extends State<HomePage> {
             stockQuantity: data['stockQuantity'] ?? 0,
             keywords: List<String>.from(data['keywords'] ?? []),
             variants: variants,
+            returnDays: data['returnDays'] is int ? data['returnDays'] : null,
+            replacementDays: data['replacementDays'] is int
+                ? data['replacementDays']
+                : null,
+            cancellationCharge: data['cancellationCharge'] is num
+                ? (data['cancellationCharge'] as num).toDouble()
+                : null,
           );
         }).toList();
       });
@@ -582,6 +589,24 @@ class _HomePage extends State<HomePage> {
             _cleanString(productMap['Description']) ?? 'No Description';
         final deliveryTime = _cleanString(productMap['Delivery Time']) ?? 'N/A';
 
+        // Extract new return/replacement/cancellation fields
+        final returnDaysStr = _cleanString(productMap['Return']);
+        final returnDays = returnDaysStr != null
+            ? int.tryParse(returnDaysStr)
+            : null;
+
+        final replacementDaysStr = _cleanString(productMap['Replacement']);
+        final replacementDays = replacementDaysStr != null
+            ? int.tryParse(replacementDaysStr)
+            : null;
+
+        final cancellationChargeStr = _cleanString(
+          productMap['Cancellation_Charge'],
+        );
+        final cancellationCharge = cancellationChargeStr != null
+            ? _parsePrice(cancellationChargeStr)
+            : null;
+
         // Calculate total stock from variants if available, otherwise use product stock
         int totalStock = 0;
 
@@ -711,6 +736,9 @@ class _HomePage extends State<HomePage> {
                 ].where((k) => k.isNotEmpty).toList(),
           'variants': variantsList,
           'hasVariants': variantsList.isNotEmpty,
+          'returnDays': returnDays,
+          'replacementDays': replacementDays,
+          'cancellationCharge': cancellationCharge,
         };
 
         // Check if product already exists
@@ -1078,6 +1106,88 @@ class _HomePage extends State<HomePage> {
               Text(
                 '${product.variants.length} variant${product.variants.length > 1 ? 's' : ''}',
                 style: TextStyle(color: Colors.blue[600], fontSize: 12),
+              ),
+            // Display return/replacement/cancellation info
+            if (product.returnDays != null ||
+                product.replacementDays != null ||
+                product.cancellationCharge != null)
+              Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: Row(
+                  children: [
+                    if (product.returnDays != null) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.blue[300]!,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          'Return: ${product.returnDays}d',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                    ],
+                    if (product.replacementDays != null) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.green[300]!,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          'Replace: ${product.replacementDays}d',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.green[800],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                    ],
+                    if (product.cancellationCharge != null) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: Colors.orange[300]!,
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel: ₹${product.cancellationCharge!.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
           ],
         ),

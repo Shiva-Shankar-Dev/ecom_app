@@ -5,6 +5,11 @@ class Product {
   final List<String> keywords;
   final int stockQuantity;
   final List<ProductVariant> variants; // List of product variants
+  final int? returnDays; // Number of days for return (null if not supported)
+  final int?
+  replacementDays; // Number of days for replacement (null if not supported)
+  final double?
+  cancellationCharge; // Cancellation charge in amount (null if not applicable)
 
   Product({
     required this.name,
@@ -17,6 +22,9 @@ class Product {
     required this.keywords,
     required this.stockQuantity,
     this.variants = const [],
+    this.returnDays,
+    this.replacementDays,
+    this.cancellationCharge,
   });
 
   // Get the effective price (variant price if available, otherwise base price)
