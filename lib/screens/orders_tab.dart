@@ -28,7 +28,11 @@ class _OrdersTabState extends State<OrdersTab> {
 
   String _selectedStatusFor(Order order) {
     final current = _statusSelections[order.orderId] ?? order.status;
-    return current.toLowerCase();
+    // Normalize standard statuses to lowercase to match _statusOptions
+    if (_statusOptions.contains(current.toLowerCase())) {
+      return current.toLowerCase();
+    }
+    return current;
   }
 
   String _formatStatus(String status) {
@@ -46,6 +50,14 @@ class _OrdersTabState extends State<OrdersTab> {
         return Color(0xFF9C27B0);
       case 'delivered':
         return Color(0xFF4CAF50);
+      case 'request for return':
+      case 'return approved':
+      case 'return rejected':
+        return Colors.red;
+      case 'request for replacement':
+      case 'replacement approved':
+      case 'replacement rejected':
+        return Colors.purple;
       default:
         return Colors.grey;
     }
@@ -234,9 +246,7 @@ class _OrdersTabState extends State<OrdersTab> {
       DateTime date = DateTime.parse(dateKey);
       String formattedDate = DateFormat('EEEE, MMM dd, yyyy').format(date);
 
-      sliverItems.add(
-        _buildDateHeader(formattedDate),
-      );
+      sliverItems.add(_buildDateHeader(formattedDate));
 
       for (Order order in dayOrders) {
         sliverItems.add(_buildOrderCard(order));
@@ -300,9 +310,7 @@ class _OrdersTabState extends State<OrdersTab> {
         ),
         SliverPadding(
           padding: EdgeInsets.only(bottom: 20),
-          sliver: SliverToBoxAdapter(
-            child: SizedBox.shrink(),
-          ),
+          sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
         ),
       ],
     );
@@ -384,7 +392,11 @@ class _OrdersTabState extends State<OrdersTab> {
                             color: Colors.grey[100],
                             borderRadius: BorderRadius.circular(11),
                           ),
-                          child: Icon(Icons.image, size: 40, color: Colors.grey),
+                          child: Icon(
+                            Icons.image,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
                         ),
                       ),
                     ),
@@ -414,7 +426,7 @@ class _OrdersTabState extends State<OrdersTab> {
                             fontFamily: 'monospace',
                           ),
                         ),
-                        SizedBox(height: 15,),
+                        SizedBox(height: 15),
                         Container(
                           padding: EdgeInsets.symmetric(
                             horizontal: 10,
@@ -455,20 +467,12 @@ class _OrdersTabState extends State<OrdersTab> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildQuickInfo('Qty', '${order.quantity}'),
-                    Container(
-                      height: 30,
-                      width: 1,
-                      color: Colors.grey[300],
-                    ),
+                    Container(height: 30, width: 1, color: Colors.grey[300]),
                     _buildQuickInfo(
                       'Amount',
                       '\$${order.totalAmount.toStringAsFixed(2)}',
                     ),
-                    Container(
-                      height: 30,
-                      width: 1,
-                      color: Colors.grey[300],
-                    ),
+                    Container(height: 30, width: 1, color: Colors.grey[300]),
                     _buildQuickInfo(
                       'Date',
                       DateFormat('MMM dd').format(order.orderDate),
@@ -488,7 +492,11 @@ class _OrdersTabState extends State<OrdersTab> {
                         color: Colors.blue[50],
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Icon(Icons.person_outline, size: 14, color: Colors.blue[600]),
+                      child: Icon(
+                        Icons.person_outline,
+                        size: 14,
+                        color: Colors.blue[600],
+                      ),
                     ),
                     SizedBox(width: 10),
                     Text(
@@ -523,7 +531,11 @@ class _OrdersTabState extends State<OrdersTab> {
                               color: Colors.blue[100],
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Icon(Icons.style, size: 12, color: Colors.blue[700]),
+                            child: Icon(
+                              Icons.style,
+                              size: 12,
+                              color: Colors.blue[700],
+                            ),
                           ),
                           SizedBox(width: 8),
                           Text(
@@ -561,35 +573,157 @@ class _OrdersTabState extends State<OrdersTab> {
                                     ),
                                   ),
                                 ),
-                              ).toList(),
+                              )
+                              .toList(),
                         ),
                       ],
                     ],
                   ),
                 ),
               ],
-              // Status Update Section
-              SizedBox(height: 16),
-              if (isDelivered)
+              // Action Required Section for Requests
+              // Action Required Section for Requests
+              if (displayStatus.toLowerCase() == 'request for return' ||
+                  displayStatus.toLowerCase() == 'request for replacement') ...[
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 6),
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
+                    color: statusColor.withAlpha(15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.green[300]!, width: 1.5),
+                    border: Border.all(
+                      color: statusColor.withAlpha(80),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: statusColor,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              displayStatus.toLowerCase() ==
+                                      'request for return'
+                                  ? 'Customer requested Return'
+                                  : 'Customer requested Replacement',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: statusColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isUpdating
+                                  ? null
+                                  : () {
+                                      final newStatus =
+                                          displayStatus.toLowerCase() ==
+                                              'request for return'
+                                          ? 'Return Rejected'
+                                          : 'Replacement Rejected';
+                                      setState(() {
+                                        _statusSelections[order.orderId] =
+                                            newStatus;
+                                      });
+                                      _updateOrderStatus(order);
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red[50],
+                                foregroundColor: Colors.red,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  side: BorderSide(color: Colors.red),
+                                ),
+                              ),
+                              child: Text('Reject'),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isUpdating
+                                  ? null
+                                  : () {
+                                      final newStatus =
+                                          displayStatus.toLowerCase() ==
+                                              'request for return'
+                                          ? 'Return Approved'
+                                          : 'Replacement Approved';
+                                      setState(() {
+                                        _statusSelections[order.orderId] =
+                                            newStatus;
+                                      });
+                                      _updateOrderStatus(order);
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text('Approve'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (isDelivered ||
+                  displayStatus.toLowerCase().contains('approved') ||
+                  displayStatus.toLowerCase().contains('rejected')) ...[
+                Container(
+                  margin: EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDelivered
+                        ? Colors.green[50]
+                        : statusColor.withAlpha(15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDelivered
+                          ? Colors.green[300]!
+                          : statusColor.withAlpha(80),
+                      width: 1.5,
+                    ),
                   ),
                   child: Row(
                     children: [
                       Container(
                         padding: EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.green[200],
+                          color: isDelivered
+                              ? Colors.green[200]
+                              : statusColor.withAlpha(30),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.check_circle,
-                          color: Colors.green[700],
+                          isDelivered ||
+                                  displayStatus.toLowerCase().contains(
+                                    'approved',
+                                  )
+                              ? Icons.check_circle
+                              : Icons.cancel,
+                          color: isDelivered ? Colors.green[700] : statusColor,
                           size: 18,
                         ),
                       ),
@@ -599,19 +733,25 @@ class _OrdersTabState extends State<OrdersTab> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Order Delivered',
+                              isDelivered
+                                  ? 'Order Delivered'
+                                  : _formatStatus(displayStatus),
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.green[900],
+                                color: isDelivered
+                                    ? Colors.green[900]
+                                    : statusColor,
                               ),
                             ),
                             SizedBox(height: 4),
                             Text(
-                              'Status updates are locked for delivered orders',
+                              'Status updates are completed for this order',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.green[700],
+                                color: isDelivered
+                                    ? Colors.green[700]
+                                    : statusColor.withOpacity(0.8),
                               ),
                             ),
                           ],
@@ -619,15 +759,18 @@ class _OrdersTabState extends State<OrdersTab> {
                       ),
                     ],
                   ),
-                )
-              else
+                ),
+              ] else
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 6),
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: statusColor.withAlpha(8),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: statusColor.withAlpha(80), width: 1.5),
+                    border: Border.all(
+                      color: statusColor.withAlpha(80),
+                      width: 1.5,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -665,20 +808,28 @@ class _OrdersTabState extends State<OrdersTab> {
                                   vertical: 12,
                                 ),
                               ),
-                              items: _statusOptions
-                                  .map(
-                                    (status) => DropdownMenuItem(
-                                      value: status,
-                                      child: Text(_formatStatus(status)),
-                                    ),
-                                  )
-                                  .toList(),
+                              items:
+                                  {
+                                        ..._statusOptions,
+                                        if (!_statusOptions.contains(
+                                          displayStatus.toLowerCase(),
+                                        ))
+                                          displayStatus,
+                                      }
+                                      .map(
+                                        (status) => DropdownMenuItem(
+                                          value: status,
+                                          child: Text(_formatStatus(status)),
+                                        ),
+                                      )
+                                      .toList(),
                               onChanged: isUpdating
                                   ? null
                                   : (value) {
                                       if (value == null) return;
                                       setState(() {
-                                        _statusSelections[order.orderId] = value;
+                                        _statusSelections[order.orderId] =
+                                            value;
                                       });
                                     },
                             ),
@@ -700,24 +851,13 @@ class _OrdersTabState extends State<OrdersTab> {
                               ),
                               elevation: 2,
                             ),
-                            child: isUpdating
-                                ? SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : Text(
-                                    'Update',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
+                            child: Text(
+                              'Update',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -736,7 +876,11 @@ class _OrdersTabState extends State<OrdersTab> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle_outline, size: 14, color: Colors.green[600]),
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 14,
+                        color: Colors.green[600],
+                      ),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
