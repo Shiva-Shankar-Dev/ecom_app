@@ -342,7 +342,7 @@ class _OrdersTabState extends State<OrdersTab> {
     final displayStatus = _selectedStatusFor(order);
     final statusColor = _colorForStatus(displayStatus);
     final isUpdating = _isUpdating[order.orderId] == true;
-    final isDelivered = displayStatus.toLowerCase() == 'delivered';
+    final isDelivered = order.status.toLowerCase() == 'delivered';
 
     return Container(
       decoration: BoxDecoration(
@@ -689,8 +689,8 @@ class _OrdersTabState extends State<OrdersTab> {
                   ),
                 ),
               ] else if (isDelivered ||
-                  displayStatus.toLowerCase().contains('approved') ||
-                  displayStatus.toLowerCase().contains('rejected')) ...[
+                  order.status.toLowerCase().contains('approved') ||
+                  order.status.toLowerCase().contains('rejected')) ...[
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 6),
                   padding: EdgeInsets.all(12),
