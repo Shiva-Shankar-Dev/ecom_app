@@ -19,6 +19,26 @@ class _OrdersTabState extends State<OrdersTab> {
   // Track in-flight updates per orderId
   final Map<String, bool> _isUpdating = {};
 
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _showRequestsOnly = false;
+
+  int get _pendingRequestCount {
+    return widget.orders
+        .where(
+          (o) =>
+              o.status.toLowerCase() == 'request for return' ||
+              o.status.toLowerCase() == 'request for replacement',
+        )
+        .length;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   static const List<String> _statusOptions = [
     'confirmed',
     'packed',
@@ -136,6 +156,10 @@ class _OrdersTabState extends State<OrdersTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Only show "No Orders Yet" if there are truly no orders and no search is active.
+    // However, the original logic showed it if list was empty.
+    // If we want search to work, we need to let the list build but maybe show empty state inside list if filtered.
+    // But if widget.orders is globally empty, we can keep the original empty state.
     if (widget.orders.isEmpty) {
       return CustomScrollView(
         slivers: [
@@ -227,10 +251,30 @@ class _OrdersTabState extends State<OrdersTab> {
   }
 
   Widget _buildModernOrdersList() {
-    if (widget.orders.isEmpty) return SizedBox.shrink();
+    List<Order> filteredOrders = widget.orders;
+
+    // First, filter by Request Status if toggled
+    if (_showRequestsOnly) {
+      filteredOrders = filteredOrders
+          .where(
+            (o) =>
+                o.status.toLowerCase() == 'request for return' ||
+                o.status.toLowerCase() == 'request for replacement',
+          )
+          .toList();
+    }
+
+    if (_searchQuery.isNotEmpty) {
+      filteredOrders = filteredOrders.where((order) {
+        return order.orderId.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // Hide main empty check here because we want to allow search
+    // But if filtered list is empty, we handle it below.
 
     Map<String, List<Order>> ordersByDate = {};
-    for (Order order in widget.orders) {
+    for (Order order in filteredOrders) {
       String dateKey = DateFormat('yyyy-MM-dd').format(order.orderDate);
       ordersByDate[dateKey] ??= [];
       ordersByDate[dateKey]!.add(order);
@@ -241,15 +285,32 @@ class _OrdersTabState extends State<OrdersTab> {
 
     // Create flat list of widgets: date headers + order cards
     List<Widget> sliverItems = [];
-    for (String dateKey in sortedDates) {
-      List<Order> dayOrders = ordersByDate[dateKey]!;
-      DateTime date = DateTime.parse(dateKey);
-      String formattedDate = DateFormat('EEEE, MMM dd, yyyy').format(date);
 
-      sliverItems.add(_buildDateHeader(formattedDate));
+    if (filteredOrders.isEmpty) {
+      sliverItems.add(
+        Padding(
+          padding: EdgeInsets.only(top: 50),
+          child: Center(
+            child: Text(
+              _showRequestsOnly
+                  ? "No orders with pending requests found"
+                  : "No orders found matching '$_searchQuery'",
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    } else {
+      for (String dateKey in sortedDates) {
+        List<Order> dayOrders = ordersByDate[dateKey]!;
+        DateTime date = DateTime.parse(dateKey);
+        String formattedDate = DateFormat('EEEE, MMM dd, yyyy').format(date);
 
-      for (Order order in dayOrders) {
-        sliverItems.add(_buildOrderCard(order));
+        sliverItems.add(_buildDateHeader(formattedDate));
+
+        for (Order order in dayOrders) {
+          sliverItems.add(_buildOrderCard(order));
+        }
       }
     }
 
@@ -277,22 +338,71 @@ class _OrdersTabState extends State<OrdersTab> {
                       color: Colors.grey[900],
                     ),
                   ),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.grey[100],
-                    ),
-                    child: IconButton(
-                      icon: Icon(Icons.refresh, color: Colors.grey[700]),
-                      onPressed: () {
-                        widget.onRefresh();
-                      },
-                    ),
+                  Row(
+                    children: [
+                      // Notification Icon for Requests
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              _showRequestsOnly
+                                  ? Icons.notifications_active
+                                  : Icons.notifications_none,
+                              color: _showRequestsOnly
+                                  ? Colors.blue
+                                  : Colors.grey[700],
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _showRequestsOnly = !_showRequestsOnly;
+                              });
+                            },
+                          ),
+                          if (_pendingRequestCount > 0)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: BoxConstraints(
+                                  minWidth: 16,
+                                  minHeight: 16,
+                                ),
+                                child: Text(
+                                  '$_pendingRequestCount',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.grey[100],
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.refresh, color: Colors.grey[700]),
+                          onPressed: () {
+                            widget.onRefresh();
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               Text(
-                '${widget.orders.length} order${widget.orders.length != 1 ? 's' : ''}',
+                '${filteredOrders.length} order${filteredOrders.length != 1 ? 's' : ''}',
                 style: TextStyle(
                   fontSize: 13,
                   color: Colors.grey[600],
@@ -300,6 +410,44 @@ class _OrdersTabState extends State<OrdersTab> {
                 ),
               ),
             ],
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: "Search Order ID...",
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[100],
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 0,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear),
+                        onPressed: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+            ),
           ),
         ),
         SliverList(
