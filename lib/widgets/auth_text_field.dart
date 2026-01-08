@@ -40,12 +40,14 @@ class AuthTextField extends StatelessWidget {
           ),
         ),
         controller: controller,
-        validator: validator ?? (value) {
-          if (value == null || value.isEmpty) {
-            return '${hintText} is required';
-          }
-          return null;
-        },
+        validator:
+            validator ??
+            (value) {
+              if (value == null || value.isEmpty) {
+                return '${hintText} is required';
+              }
+              return null;
+            },
       ),
     );
   }
@@ -58,14 +60,17 @@ class AuthTextFieldForPassword extends StatefulWidget {
     required this.controller,
     this.hide = false,
     this.validator,
+    this.onSubmitted,
   });
   final String? Function(String?)? validator;
+  final Function(String)? onSubmitted;
   String hintText;
   bool hide;
   TextEditingController controller;
 
   @override
-  State<AuthTextFieldForPassword> createState() => _AuthTextFieldForPasswordState();
+  State<AuthTextFieldForPassword> createState() =>
+      _AuthTextFieldForPasswordState();
 }
 
 class _AuthTextFieldForPasswordState extends State<AuthTextFieldForPassword> {
@@ -101,20 +106,25 @@ class _AuthTextFieldForPasswordState extends State<AuthTextFieldForPassword> {
               });
             },
             icon: Icon(
-              isObscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              isObscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
             ),
           ),
         ),
         controller: widget.controller,
-        validator: widget.validator ?? (value) {
-          if (value == null || value.isEmpty) {
-            return 'Password is required';
-          }
-          if (value.length < 6) {
-            return 'Password must be at least 6 characters';
-          }
-          return null;
-        },
+        validator:
+            widget.validator ??
+            (value) {
+              if (value == null || value.isEmpty) {
+                return 'Password is required';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
+        onFieldSubmitted: widget.onSubmitted,
       ),
     );
   }

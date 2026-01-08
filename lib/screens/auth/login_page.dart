@@ -30,9 +30,9 @@ class _LoginPageState extends State<LoginPage> {
       Navigator.pushNamed(context, '/home');
     } else {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(result))
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(result)));
     }
   }
 
@@ -57,24 +57,25 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(8.0),
-                  child: Icon(Icons.shopping_cart, size: 60,),
+                  child: Icon(Icons.shopping_cart, size: 60),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 15.0),
-                  child: Text("Welcome to ECOM-APP", style: TextStyle(
+                  child: Text(
+                    "Welcome to ECOM-APP",
+                    style: TextStyle(
                       fontSize: 23,
                       fontFamily: "Poppins",
-                      fontWeight: FontWeight.bold
-                  ),),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text("Login to your account with your Email and Password! "
-                      "If you need to use mobile number use mobile number instead!",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey
-                    ),
+                  child: Text(
+                    "Login to your account with your Email and Password! "
+                    "If you need to use mobile number use mobile number instead!",
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),
                 ),
                 SizedBox(height: 20),
@@ -92,6 +93,9 @@ class _LoginPageState extends State<LoginPage> {
                           hintText: 'Password',
                           controller: passwordController,
                           hide: true,
+                          onSubmitted: (val) {
+                            loginHandle();
+                          },
                         ),
                         SizedBox(height: 20),
                         AuthButton(
@@ -104,27 +108,31 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                SizedBox(height: 10,),
+                SizedBox(height: 10),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 13.0, vertical: 2.0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13.0,
+                    vertical: 2.0,
+                  ),
                   child: Container(
                     width: MediaQuery.of(context).size.width - 10,
                     height: 50,
                     decoration: BoxDecoration(
                       border: Border.all(color: ColorPallete.color1),
-                      borderRadius: BorderRadius.circular(10)
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Center(
                       child: RichText(
                         text: TextSpan(
                           text: 'Login using ',
-                          style: TextStyle(
-                            color: Colors.black,
-                          ),
+                          style: TextStyle(color: Colors.black),
                           children: [
                             TextSpan(
                               text: 'Mobile instead?',
-                              style: TextStyle(color: ColorPallete.color1, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: ColorPallete.color1,
+                                fontWeight: FontWeight.bold,
+                              ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () {
                                   Navigator.pushNamed(context, '/mobile');
@@ -136,14 +144,14 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                SizedBox(height: 10,),
+                SizedBox(height: 10),
                 Container(
                   margin: EdgeInsets.symmetric(horizontal: 13.0, vertical: 2.0),
                   width: MediaQuery.of(context).size.width - 10,
                   height: 50,
                   decoration: BoxDecoration(
                     border: Border.all(color: ColorPallete.color1),
-                    borderRadius: BorderRadius.circular(10)
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -151,13 +159,14 @@ class _LoginPageState extends State<LoginPage> {
                       RichText(
                         text: TextSpan(
                           text: 'Don\'t have an account? ',
-                          style: TextStyle(
-                            color: Colors.black,
-                          ),
+                          style: TextStyle(color: Colors.black),
                           children: [
                             TextSpan(
                               text: 'Sign Up',
-                              style: TextStyle(color: ColorPallete.color1, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: ColorPallete.color1,
+                                fontWeight: FontWeight.bold,
+                              ),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () {
                                   Navigator.pushNamed(context, '/signup');
